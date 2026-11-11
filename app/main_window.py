@@ -595,6 +595,23 @@ class MainWindow(QtWidgets.QMainWindow):
         grid.addWidget(self.btn_disturb, 2, 0, 1, 2)
         pv.addLayout(grid)
 
+        # Banner Logo Afiliasi (TRIK - SV UGM)
+        logo_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "logo_trik_ugm.jpg")
+        if os.path.exists(logo_path):
+            card_logo = QtWidgets.QFrame()
+            card_logo.setObjectName("Card")
+            cl_layout = QtWidgets.QVBoxLayout(card_logo)
+            cl_layout.setContentsMargins(8, 8, 8, 8)
+            cl_layout.setSpacing(0)
+
+            lbl_logo = QtWidgets.QLabel()
+            lbl_logo.setAlignment(Qt.AlignCenter)
+            pix = QtGui.QPixmap(logo_path)
+            if not pix.isNull():
+                lbl_logo.setPixmap(pix.scaled(305, 70, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+            cl_layout.addWidget(lbl_logo)
+            pv.addWidget(card_logo)
+
         pv.addStretch(1)
         scroll.setWidget(panel)
         # lebar minimum mengikuti isi panel supaya tidak ada yang terpotong
