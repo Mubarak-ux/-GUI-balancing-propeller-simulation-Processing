@@ -1,7 +1,7 @@
 @echo off
-title Launcher Mode Hardware Balancing Propeller (VERSI 2)
+title Launcher Aplikasi Balancing Propeller (VERSI 2)
 echo ========================================================
-echo   MENJALANKAN MODE HARDWARE BALANCING PROPELLER (VERSI 2)
+echo   MENJALANKAN APLIKASI BALANCING PROPELLER (VERSI 2)
 echo ========================================================
 echo.
 
@@ -18,9 +18,9 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
-:: Jalankan launcher hardware Python (otomatis membuka 3D Viewer & GUI)
-echo Menjalankan launcher mode hardware...
-python "%~dp0run_hardware.py" %*
+:: Jalankan launcher utama Python (otomatis membuka 3D Viewer & GUI)
+echo Menjalankan aplikasi Balancing Propeller...
+python "%~dp0run_app.py" %*
 
 if %errorlevel% neq 0 (
     echo.

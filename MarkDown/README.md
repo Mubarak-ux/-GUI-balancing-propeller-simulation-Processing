@@ -22,25 +22,26 @@ Menggunakan representasi visual 3D **Processing (P3D)** yang sangat ringan mengg
      - **Tombol Keyboard di Processing**: Klik jendela 3D dan tekan **[SPACE]**!
 5. **Perhitungan Metrik Respon Transien Otomatis**:
    - Menghitung otomatis: *Overshoot %*, *Rise Time*, *Settling Time*, *Steady-State Error*, dan *Peak Time*.
-6. **Launcher 1-Klik (`run_simulasi.bat`)**:
-   - Sekali klik langsung membuka viewer Processing 3D dan GUI Python secara bersamaan.
+6. **Launcher 1-Klik (`run_app.bat` / `run_app.py`)**:
+   - Sekali klik langsung membuka viewer 3D (Processing) dan GUI Python (PySide6) secara bersamaan, mendukung mode Simulasi dan Hardware fisik.
 
 ---
 
 ## 🚀 Cara Menjalankan
 
 ### Cara 1: Menggunakan Launcher Otomatis (Paling Mudah)
-* **Dari File Explorer**: Double-click file `run_simulasi.bat`.
+* **Dari File Explorer**: Double-click file `run_app.bat`.
 * **Dari Terminal VS Code / PowerShell**:
   ```powershell
-  .\run_simulasi.bat
+  .\run_app.bat
   ```
+  *(atau `python run_app.py`)*
 
 ### Cara 2: Manual
-1. Buka file `BalancingPropellerViewer/BalancingPropellerViewer.pde` di aplikasi Processing, lalu klik tombol **Play (Run ▶)**.
+1. Buka file `BalancingPropellerIMU/BalancingPropellerIMU.pde` di aplikasi Processing, lalu klik tombol **Play (Run ▶)**.
 2. Di terminal folder `VERSI 2`, jalankan:
    ```bash
-   python run_sim.py
+   python run_app.py --no-3d
    ```
 
 ---
