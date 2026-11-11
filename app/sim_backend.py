@@ -14,7 +14,7 @@ class Params:
     """Sumber: docs/ringkasan_pengukuran.md (10 Nov 2026)."""
     L = 0.25                 # m, poros ke pusat propeler (terukur)
     J0 = 0.0140              # kg.m^2, hitungan manual (m = 393,9 g)
-    b = 0.02                 # N.m.s/rad, redaman gesek poros (tebakan)
+    b = 0.033                # N.m.s/rad, redaman poros (ukur: docs/pengukuran_b.md)
     Fmax = 8.0               # N, thrust maks per motor (tebakan)
     tau = 0.10               # s, lag motor + propeler (orde-1, tebakan)
     stop = math.radians(30)  # batas mekanik sudut (terukur +/-30 deg)

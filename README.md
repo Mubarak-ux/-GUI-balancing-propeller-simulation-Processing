@@ -87,7 +87,7 @@ pip install -r requirements.txt
 VERSI 2/
 ├── app/                     # Kode Python (GUI & backend)
 ├── BalancingPropellerIMU/   # Sketch Processing 3D viewer (.pde)
-├── docs/                    # Dokumentasi & catatan
+├── docs/                    # Dokumentasi & catatan (lihat docs/README.md)
 │   └── assets/              # Gambar pendukung (tampak atas/depan/…)
 ├── firmware/                # Backup firmware Arduino Uno (.hex)
 ├── data/                    # Hasil rekaman CSV (tidak di-commit)
@@ -113,3 +113,9 @@ Sketch `.pde` dimodularisasi menjadi beberapa tab di aplikasi Processing:
 * **`CameraIMU.pde`**: Kontrol kamera orbit 3D, pencahayaan scene, lantai grid, serta event mouse & keyboard.
 * **`ModelIMU.pde`**: Geometri 3D rakitan alat balancing propeller, baling-baling blur, panah gaya thrust, dan busur derajat.
 * **`HudIMU.pde`**: Tampilan 2D overlay Heads-Up Display (informasi telemetri, status koneksi, dan notifikasi).
+
+### Dokumentasi (`docs/`)
+* **[`docs/README.md`](docs/README.md)**: Indeks seluruh dokumen & aset.
+* **[`docs/ringkasan_pengukuran.md`](docs/ringkasan_pengukuran.md)**: Data terukur alat (massa, dimensi, J) & parameter simulasi.
+* **[`docs/pengukuran_b.md`](docs/pengukuran_b.md)**: Identifikasi redaman `b` (uji ayunan, `b = 2·J·α`).
+* **[`docs/versi2.md`](docs/versi2.md)**: Komparasi VERSI 1 vs VERSI 2.

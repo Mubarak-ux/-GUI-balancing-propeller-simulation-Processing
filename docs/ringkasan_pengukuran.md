@@ -44,6 +44,10 @@ Tanggal data: 10 November 2026.
 **Nilai dipakai: m = 393,9 +/- 2,0 g (n = 10).**
 Catatan: nilai 405 g adalah pengukuran ke-10 (terbesar), tidak dipakai sebagai massa total. Rata-rata dipilih agar tidak bias ke nilai ekstrem.
 
+Penimbangan ulang mandiri (2026-11-11): **m = 393,3 g**, konsisten dengan
+rata-rata di atas (selisih 0,6 g, di dalam ±2 g). Nilai ini dipakai untuk
+perhitungan momen inersia.
+
 Angka ini sudah mencakup 2 motor, 2 ESC, 2 propeller, IMU, kabel, dan baut.
 
 ### 2.2 Massa tiap bagian
@@ -71,7 +75,18 @@ Angka ini sudah mencakup 2 motor, 2 ESC, 2 propeller, IMU, kabel, dan baut.
 
 ## 4. Momen inersia J (hitungan manual)
 
-Rumus (teorema sumbu sejajar): `J = J_batang + sum(m_i * d_i^2)`, dengan `J_batang = (1/12) * m_batang * Lb^2`.
+Rumus (teorema sumbu sejajar / parallel axis):
+
+```
+J = J_batang + Σ (m_i · d_i²)
+J_batang = (1/12) · m_batang · Lb²      (poros di tengah batang)
+```
+
+Angka `1/12` berasal dari integrasi `J = ∫ r² dm` untuk batang seragam dengan
+sumbu di tengah: `(m/L)·[x³/3]` dari `−L/2` ke `+L/2` = `(1/12)·m·L²`.
+(Jika poros tidak di pusat batang: `J_batang = (1/12)·m·L² + m·d²`.)
+
+J tidak bergantung pada `b` maupun `F`; cukup dari massa dan jarak tiap bagian.
 
 | Bagian | m (kg) | d (m) | J (kg.m^2) |
 |---|---|---|---|
@@ -89,6 +104,12 @@ Cek batas fisik: bila seluruh massa 0,394 kg berada di ujung batang (0,27 m), J 
 
 Sumber galat: massa propeller (asumsi), batang dianggap seragam padahal bagian tengahnya lebih lebar, kabel dan baut dianggap menyatu dengan batang. Bandingkan juga dengan J dari model CAD.
 
+J ini adalah **J pengukuran tidak langsung** (dari massa + geometri). Karena `b`
+hasil identifikasi memakai `b = 2·J·α`, nilai b **berskala proporsional**
+terhadap J; ketidakpastian J (±0,001) menyumbang ketidakpastian b terbesar.
+Untuk J absolut yang independen, ukur langsung (bandul bifilar atau tambah
+massa simetris) lalu hitung ulang `b = 2·J·α`.
+
 ---
 
 ## 5. Parameter simulasi terkini
@@ -96,13 +117,35 @@ Sumber galat: massa propeller (asumsi), batang dianggap seragam padahal bagian t
 ```python
 class Params:
     L    = 0.25                    # m, poros ke pusat propeller (terukur)
-    J0   = 0.0140                  # kg.m^2, hitungan manual (m = 393,9 g)
-    b    = 0.02                    # N.m.s/rad, TEBAKAN -> ukur dari peluruhan
+    J0   = 0.0140                  # kg.m^2, hitungan manual (m = 393,3 g, rentang 0,013-0,015)
+    b    = 0.033                   # N.m.s/rad, uji ayunan: b = 2*J0*alpha (docs/pengukuran_b.md)
     Fmax = 8.0                     # N, TEBAKAN batas kerja -> ukur dari tes thrust
     tau  = 0.10                    # s, lag motor + propeller (orde-1), TEBAKAN
     stop = math.radians(30)        # batas mekanik +/-30 deg (terukur)
     dt   = 0.005                   # s, 200 Hz
 ```
+
+### 5.1 Asal nilai redaman b
+
+Data uji ayunan menunjukkan gerak **berayun teredam** (ada torsi pemulih),
+bukan luncuran monoton, sehingga modelnya `J·θ̈ + b·θ̇ + k·θ = 0`. Dari bentuk
+standar `θ̈ + 2ζωₙθ̇ + ωₙ²θ = 0`, diperoleh `b/J = 2α` (α = laju peluruhan
+amplop), sehingga:
+
+```
+b = 2 · J · α
+```
+
+α didapat dengan fit `θ(t) = off + A·e^(−αt)·cos(ω_d·t + φ)` pada CSV uji
+ayunan. Setara versi manual (dua puncak searah):
+
+```
+b = 2 · J · ln(A₁/A₂) / Δt
+```
+
+Hasil: **b ≈ 0,033 N·m·s/rad** (0,031–0,038). Rincian di
+`docs/pengukuran_b.md`. Catatan: b ini hanya gesekan poros (motor mati),
+belum termasuk redaman aerodinamis baling-baling saat berputar.
 
 ---
 
@@ -114,7 +157,8 @@ class Params:
 | Deadband PWM | Titik PWM saat bacaan timbangan mulai berubah | Tinggi |
 | Tegangan dan rating arus power supply | Baca label | Tinggi |
 | Rating arus ESC | Baca label ESC | Tinggi |
-| Redaman b | Beri dorongan awal tanpa motor, catat peluruhan kecepatan sudut dari IMU | Sedang |
+| Redaman b | ✅ Terukur ~0,033 (uji ayunan, motor mati) — lihat `docs/pengukuran_b.md` | Selesai |
+| J absolut (independen dari b) | Bandul bifilar: `J = T²·m·g·d²/(4π²·L)`; atau tambah massa simetris lalu pisahkan J dari k | Sedang |
 | Batas sudut mekanik (stop) | Ukur sudut maks sebelum batang menabrak | Sedang |
 | Titik setimbang (pusat massa l) | Cek apakah batang diam di sudut sembarang tanpa motor | Sedang |
 | Offset IMU | Cek horizontal dengan waterpass, baca IMU | Sedang |
@@ -128,5 +172,11 @@ class Params:
 
 - Motor 2200 KV dengan propeller 10 inci beban arusnya tinggi. Naikkan PWM pelan-pelan saat tes thrust, tahan tiap titik 3 sampai 5 detik, dan pantau suhu motor dan ESC.
 - Motor tidak bisa menghasilkan thrust negatif, jadi perlu **thrust dasar (bias)** pada kedua motor, lalu PID menambah dan mengurangi selisihnya. Batasi `0 <= F <= Fmax` di simulasi dan tangani integral windup.
-- Jika `l` sekitar 0 (pusat massa di pivot), suku gravitasi dibuang: `J*theta'' = L*(F1 - F2) - b*theta'`. Asumsi ini **belum diverifikasi**.
+- Jika `l` sekitar 0 (pusat massa di pivot), suku gravitasi dibuang: `J*theta'' = L*(F1 - F2) - b*theta'`. Uji lepas statis menunjukkan batang praktis
+  diam di berbagai sudut (l ≈ 0), **tetapi** data ayunan memperlihatkan sedikit
+  gerak pemulih (l orde beberapa mm). Suku gravitasi kecil ini diabaikan di
+  simulasi (`l = 0`).
+- `J` dan `b` tidak dapat dipisahkan dari satu uji ayunan bebas (yang terukur
+  hanya rasio `b/J`). Nilai b di sini memakai J hitungan manual; untuk b yang
+  sepenuhnya independen perlu J diukur langsung (lihat tabel to-do).
 - Cek refresh rate ESC. Banyak ESC standar memakai PWM 50 Hz, sehingga loop 200 Hz belum tentu berarti 200 perintah baru per detik sampai ke motor.

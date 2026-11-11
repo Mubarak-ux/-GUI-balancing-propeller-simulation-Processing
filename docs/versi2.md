@@ -29,7 +29,7 @@ Meskipun visualizer 3D di-upgrade sepenuhnya, **antarmuka GUI Python (PySide6) s
 | **Visualisasi Putaran Baling-baling** | Rotasi geometri biasa | **Motion Blur Spinning Disc** dinamis | Efek blur piringan berkecepatan tinggi mengikuti RPM motor |
 | **Busur Derajat Sudut (*Protractor Arc*)** | ❌ Hanya ada di 2D | ✅ **Ada di 2D dan 3D** | Skala busur $-30^\circ$ s/d $+30^\circ$ (batas mekanik terukur) dengan jarum aktual & setpoint |
 | **Preset Kamera Navigasi** | Mengikuti orbit standar Blender | Tombol `1` (Depan), `2` (Samping), `3` (Atas), `4` (Bawah), `R` (Reset) | Tampilan Depan (1) persis sejajar dengan tampilan 2D GUI |
-| **Modularitas Skrip 3D** | 1 file script monolithic (`blender_receiver.py`) | **5 Modul PDE Terpisah** (`Network`, `Camera`, `Model`, `HUD`, `Main`) | Struktur kode terorganisir rapi per fungsi kerja |
+| **Modularitas Skrip 3D** | 1 file script monolithic (`blender_receiver.py`) | **5 Modul PDE Terpisah** (`NetworkIMU`, `CameraIMU`, `ModelIMU`, `HudIMU`, `BalancingPropellerIMU`) | Struktur kode terorganisir rapi per fungsi kerja |
 | **Kemudahan Eksekusi** | Harus membuka Blender manual $\to$ Text Editor $\to$ Run Script | **1-Klik Launcher** (`run_app.bat` / `run_app.py`) | Otomatis meluncurkan viewer 3D dan GUI Python bersamaan |
 
 ---
@@ -125,17 +125,22 @@ VERSI 2/
 │   ├── processing_stream.py          # Pengirim telemetri UDP + ACK + listener impuls
 │   ├── sim_backend.py                # Model dinamika fisika & kontrol PID
 │   └── theme.py                      # Stylesheet QSS modern
-├── BalancingPropellerViewer/         # Visualizer 3D Modular (Processing P3D)
-│   ├── BalancingPropellerViewer.pde  # Main setup(), draw loop, & state telemetri
-│   ├── Camera.pde                    # Pengaturan kamera orbit, pencahayaan, input kontrol
-│   ├── HUD.pde                       # Overlay Heads-Up Display 2D
-│   ├── Model.pde                     # Geometri 3D rakitan alat, panah thrust, baling-baling
-│   └── Network.pde                   # Socket UDP, JSON parser, ACK reply, & pemicu impuls
-├── Dokumentasi/                      # Berkas Dokumentasi & Tangkapan Layar
-│   ├── README.md                     # Petunjuk instalasi & kontrol
+├── BalancingPropellerIMU/            # Visualizer 3D Modular (Processing P3D)
+│   ├── BalancingPropellerIMU.pde     # Main setup(), draw loop, & state telemetri
+│   ├── CameraIMU.pde                 # Kamera orbit, pencahayaan, input kontrol
+│   ├── HudIMU.pde                    # Overlay Heads-Up Display 2D
+│   ├── ModelIMU.pde                  # Geometri 3D rakitan alat, panah thrust, baling-baling
+│   └── NetworkIMU.pde                # Socket UDP, JSON parser, ACK reply, & pemicu impuls
+├── docs/                             # Dokumentasi & Tangkapan Layar
+│   ├── README.md                     # Indeks dokumentasi
+│   ├── ringkasan_pengukuran.md       # Data terukur alat & parameter simulasi
+│   ├── pengukuran_b.md               # Identifikasi redaman b (uji ayunan)
 │   ├── versi2.md                     # Laporan komparasi & upgrade VERSI 1 vs VERSI 2
 │   ├── dokumentasiPY.png             # Tangkapan layar GUI Python
-│   └── dokumentasiPDE.png            # Tangkapan layar visualizer Processing 3D
-├── run_app.py                         # Launcher utama Python (Simulasi & Hardware)
-└── run_app.bat                        # Script batch 1-klik untuk Windows (Launcher Utama)
+│   ├── dokumentasiPDE.png            # Tangkapan layar visualizer Processing 3D
+│   └── assets/                       # Gambar tampak alat (atas/depan/samping/bawah)
+├── firmware/                         # Backup firmware Arduino Uno (.hex)
+├── data/                             # Hasil rekaman CSV (tidak di-commit)
+├── run_app.py                        # Launcher utama Python (Simulasi & Hardware)
+└── run_app.bat                       # Script batch 1-klik untuk Windows (Launcher Utama)
 ```
