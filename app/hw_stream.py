@@ -2,7 +2,7 @@
 
 Turunan dari ``ProcessingStream`` (file aslinya tidak diubah). Paket JSON
 tetap berisi kunci lama (th, prop1, prop2, sp, u, load_m, load_x, f1, f2)
-sehingga ``BalancingPropellerViewer`` lama tetap bisa membaca, ditambah
+sehingga ``BalancingPropellerIMU`` tetap bisa membaca, ditambah
 kunci dari ``extra``:
 
     mode  : "sim" / "hw"

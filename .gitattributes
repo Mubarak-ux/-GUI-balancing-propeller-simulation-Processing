@@ -1,0 +1,14 @@
+* text=auto
+
+# Skrip & source code
+*.py   text eol=lf
+*.pde  text eol=lf
+*.md   text eol=lf
+*.txt  text eol=lf
+*.bat  text eol=crlf
+
+# Aset biner (jangan diubah baris barunya)
+*.png  binary
+*.jpg  binary
+*.hex  binary
+*.csv  text eol=lf

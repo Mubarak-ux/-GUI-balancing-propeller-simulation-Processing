@@ -29,9 +29,14 @@ final int GUI_TIMEOUT_MS = 1500;
 DatagramSocket socket;
 final byte[] receiveBuffer = new byte[4096];
 final byte[] ackBytes = "ack".getBytes();
+final byte[] impulseBytes = "impulse".getBytes();
 String netError = null;
 
 int lastPacketTime = -100000;
+
+// alamat terakhir GUI yang mengirim paket (tujuan balasan "impulse")
+InetAddress lastGuiAddr = null;
+int lastGuiPort = -1;
 
 // propeler & thrust (mode simulasi)
 final float PROP_WRAP_PERIOD = 360000.0;   // sinkron dengan MainWindow.PROP_WRAP
@@ -98,6 +103,8 @@ void pollUDP() {
   } catch (Exception e) {
     // abaikan
   }
+  lastGuiAddr = addr;
+  lastGuiPort = port;
 
   try {
     JSONObject j = parseJSONObject(latest);
@@ -133,6 +140,18 @@ void pollUDP() {
     lastPacketTime = millis();
   } catch (Exception e) {
     // paket rusak, abaikan
+  }
+}
+
+// Kirim sinyal impuls ke GUI (dipanggil dari keyPressed SPACE).
+// GUI membalas ACK atas paket "impulse" ini dan menerapkannya ke simulasi.
+void sendImpulse() {
+  if (socket == null || lastGuiAddr == null || lastGuiPort < 0) return;
+  try {
+    socket.send(new DatagramPacket(impulseBytes, impulseBytes.length,
+                                   lastGuiAddr, lastGuiPort));
+  } catch (Exception e) {
+    // abaikan
   }
 }
 

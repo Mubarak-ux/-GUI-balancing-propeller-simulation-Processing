@@ -11,7 +11,7 @@ G = 9.81
 # PARAMETER ALAT
 # ----------------------------------------------------------------------------
 class Params:
-    """Sumber: MarkDown/ringkasan_pengukuran.md (10 Nov 2026)."""
+    """Sumber: docs/ringkasan_pengukuran.md (10 Nov 2026)."""
     L = 0.25                 # m, poros ke pusat propeler (terukur)
     J0 = 0.0140              # kg.m^2, hitungan manual (m = 393,9 g)
     b = 0.02                 # N.m.s/rad, redaman gesek poros (tebakan)
@@ -35,13 +35,16 @@ class SimBackend:
     # Batas stabil (tanpa filter D): Kp < 0.2 + 11.4*Kd.
     DEFAULT_GAINS = (1.00, 0.80, 0.35)   # %/deg, %/(deg.s), %/(deg/s)
 
-    def __init__(self):
+    def __init__(self, seed=None):
         self.p = Params()
         self.kp, self.ki, self.kd = self.DEFAULT_GAINS
         self.sp = 0.0            # deg
         self.load_m = 0.0        # kg
         self.load_x = 0.10       # m dari poros (10 cm default, rentang 5 - 15 cm)
         self.noise = 0.2         # deg, std noise IMU
+        # seed tetap -> noise reproducible (berguna untuk laporan & skenario
+        # otomatis); None -> berbeda tiap run.
+        self.seed = seed
         self.reset()
 
     def reset(self, keep_time=False):
@@ -65,7 +68,7 @@ class SimBackend:
         self.p_term = 0.0
         self.i_term = 0.0
         self.d_term = 0.0
-        self.rng = np.random.default_rng()
+        self.rng = np.random.default_rng(self.seed)
 
     def set_gains(self, kp, ki, kd):
         self.kp, self.ki, self.kd = kp, ki, kd

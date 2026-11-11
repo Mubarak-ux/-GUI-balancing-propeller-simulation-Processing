@@ -35,11 +35,11 @@ def _light_palette():
     return pal
 
 
-def run():
+def run(seed=None, initial_mode="sim"):
     app = QtWidgets.QApplication(sys.argv)
     app.setStyle("Fusion")
     app.setPalette(_light_palette())
     app.setStyleSheet(QSS)
-    window = MainWindow()
+    window = MainWindow(seed=seed, initial_mode=initial_mode)
     window.show_fitted()
     return app.exec()

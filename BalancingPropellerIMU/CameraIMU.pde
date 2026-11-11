@@ -88,7 +88,9 @@ void mouseWheel(MouseEvent event) {
 }
 
 void keyPressed() {
-  if (key == 'g' || key == 'G') {
+  if (key == ' ') {
+    sendImpulse();                 // sentak gangguan (hanya berlaku di mode simulasi)
+  } else if (key == 'g' || key == 'G') {
     showGraph = !showGraph;
   } else if (key == 'h' || key == 'H') {
     showHUD = !showHUD;

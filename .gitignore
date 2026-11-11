@@ -15,3 +15,11 @@ env/
 # IDE / Editor files
 .vscode/
 .idea/
+
+# Hasil rekaman hardware (data percobaan lokal)
+data/*.csv
+
+# Build / cache Processing
+build/
+*.exe
+

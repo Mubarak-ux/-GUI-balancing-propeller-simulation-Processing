@@ -98,18 +98,19 @@ class MainWindow(QtWidgets.QMainWindow):
     EVENT_MAX_S = 60.0      # maksimum data yang disimpan per event
     PROP_IDLE_DPS = 900.0   # deg/s, putaran idle
     PROP_GAIN_DPS = 260.0   # deg/s per Newton thrust
-    PROP_WRAP = 360000.0    # harus sinkron dengan BalancingPropellerViewer.PROP_WRAP_PERIOD
+    PROP_WRAP = 360000.0    # harus sinkron dengan NetworkIMU.PROP_WRAP_PERIOD
     MAX_CATCHUP_S = 0.1     # batas langkah simulasi per tick jika UI tersendat
 
-    def __init__(self):
+    def __init__(self, seed=None, initial_mode="sim"):
         super().__init__()
         self.setWindowTitle("Balancing Propeller")
-        self.sim = SimBackend()
+        self.sim = SimBackend(seed=seed)
         self.hw = HardwareBackend()
         self.be = self.sim          # backend aktif (sim / hw)
         self.mode = "sim"
         self._last_rec_msg = ""
         self.paused = False
+        self.pid_locked = True     # gain PID terkunci agar tidak tergeser tak sengaja
 
         # buffer grafik (pendek, hanya jendela WINDOW_S) dan buffer event
         # (panjang, seluruh respons sejak event) dipisah supaya metrik
@@ -162,6 +163,8 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self._build_shortcuts()
         self._refresh_step_btn()
+        self._apply_pid_lock()
+        self._apply_initial_mode(initial_mode)
 
         self.timer = QtCore.QTimer(self)
         self.timer.setTimerType(Qt.PreciseTimer)
@@ -247,7 +250,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.pill_txt = QtWidgets.QLabel("PROCESSING  \u00b7  connecting\u2026")
         self.pill_txt.setObjectName("PillText")
         pill.setToolTip(f"UDP {host}:{port}\n"
-                        "Status berdasarkan balasan ACK dari BalancingPropellerViewer.pde.\n"
+                        "Status berdasarkan balasan ACK dari BalancingPropellerIMU.pde.\n"
                         "Hijau = Processing benar-benar menerima data.")
         pl.addWidget(self.pill_dot)
         pl.addWidget(self.pill_txt)
@@ -508,7 +511,15 @@ class MainWindow(QtWidgets.QMainWindow):
         pv.addWidget(self._build_source_card())
 
         controller = Card("PID")
-        # Rentang slider disesuaikan dengan model terukur (ringkasan_pengukuran.md):
+        # Tombol gembok di header kartu: kunci/buka slider gain PID.
+        self.btn_pid_lock = QtWidgets.QPushButton()
+        self.btn_pid_lock.setObjectName("Lock")
+        self.btn_pid_lock.setCheckable(True)
+        self.btn_pid_lock.setChecked(True)
+        self.btn_pid_lock.setFixedWidth(34)
+        self.btn_pid_lock.clicked.connect(self.toggle_pid_lock)
+        controller.head.addWidget(self.btn_pid_lock)
+        # Rentang slider disesuaikan dengan model terukur (docs/ringkasan_pengukuran.md):
         # di atas kira-kira Kp > 0.2 + 11.4*Kd sistem tidak stabil.
         self.kp = Param("Kp", 0, 5, self.be.kp, 0.05, "%/\u00b0")
         self.ki = Param("Ki", 0, 3, self.be.ki, 0.05, "%/(\u00b0\u00b7s)")
@@ -814,6 +825,26 @@ class MainWindow(QtWidgets.QMainWindow):
             "lbl": hw.rec_label if hw.recording else "",
         } if self.mode == "hw" else {"mode": "sim"}
 
+    def _apply_initial_mode(self, mode):
+        """Pilih mode awal (dari launcher) dan, untuk hardware, port yang
+        terlihat seperti Arduino/USB tanpa campur tangan pengguna."""
+        if mode == "hw":
+            i = self.cb_mode.findData("hw")
+            if i >= 0:
+                self.cb_mode.setCurrentIndex(i)
+            for k in range(self.cb_port.count()):
+                text = self.cb_port.itemText(k).lower()
+                if any(s in text for s in ("arduino", "ch340", "usb serial", "usb-serial")):
+                    self.cb_port.setCurrentIndex(k)
+                    break
+            else:
+                self.cb_port.insertItem(0, "(pilih port Uno \u2014 colok USB lalu \u21bb)", None)
+                self.cb_port.setCurrentIndex(0)
+        else:
+            i = self.cb_mode.findData("sim")
+            if i >= 0:
+                self.cb_mode.setCurrentIndex(i)
+
     def set_mode(self, mode):
         if mode == self.mode:
             return
@@ -828,13 +859,15 @@ class MainWindow(QtWidgets.QMainWindow):
         # Mode hardware: PID, setpoint, noise, impuls & skenario tidak berlaku
         # (motor dikendalikan firmware kating). Slider beban tetap aktif
         # sebagai keterangan beban fisik.
-        for w in (self.kp, self.ki, self.kd, self.sp, self.nz, self.btn_disturb,
+        for w in (self.sp, self.nz, self.btn_disturb,
                   self.btn_scn_run, self.btn_step):
             w.setEnabled(not hw)
+        # Gain PID mengikuti status gembok (dan terkunci paksa saat mode HW).
+        self._apply_pid_lock()
+        self.btn_pid_lock.setEnabled(not hw)
         tip = ("Mode hardware: dikendalikan firmware Uno (kating).\n"
                "GUI hanya membaca data.") if hw else ""
-        for w in (self.kp, self.ki, self.kd, self.sp):
-            w.setToolTip(tip)
+        self.sp.setToolTip(tip)
         self.view.setToolTip("" if hw else
                              "Klik pada sisi kiri atau kanan batang untuk "
                              "memberi sentakan gangguan (Impuls)!")
@@ -872,6 +905,24 @@ class MainWindow(QtWidgets.QMainWindow):
     # ------------------------------------------------------------------
     # HANDLER INPUT
     # ------------------------------------------------------------------
+    def toggle_pid_lock(self):
+        """Kunci/buka gain PID. Saat terkunci slider & spinbox dinonaktifkan
+        agar parameter tidak tergeser tanpa sengaja."""
+        self.pid_locked = self.btn_pid_lock.isChecked()
+        self._apply_pid_lock()
+
+    def _apply_pid_lock(self):
+        # Mode hardware memang sudah menonaktifkan PID; lock tetap dihormati
+        # supaya saat kembali ke simulasi status kunci tidak "bocor".
+        hw = self.mode == "hw"
+        for w in (self.kp, self.ki, self.kd):
+            w.set_locked(self.pid_locked or hw)
+        self.btn_pid_lock.setText("\U0001f512" if self.pid_locked else "\U0001f513")
+        self.btn_pid_lock.setToolTip(
+            "Gain PID terkunci \u2014 klik untuk membuka."
+            if self.pid_locked else
+            "Gain PID terbuka \u2014 klik untuk mengunci.")
+
     def on_gains(self, _=None):
         self.be.set_gains(self.kp.value(), self.ki.value(), self.kd.value())
 
@@ -997,6 +1048,9 @@ class MainWindow(QtWidgets.QMainWindow):
         else:
             n = self._steps_due()
             if n == 0:
+                # QTimer meleset ke bawah -> jaga status koneksi Processing
+                # tetap akurat walau belum ada langkah simulasi baru.
+                self.stream.heartbeat()
                 return
             for _ in range(n):
                 self.be.step()

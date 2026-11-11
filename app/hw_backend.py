@@ -301,8 +301,6 @@ class HardwareBackend:
         return time.monotonic() - self._rec_t0 if self.recording else 0.0
 
     def _record(self, now, vals, text):
-        if self._rec_writer is None:
-            return
         with self._rec_lock:
             w = self._rec_writer
             if w is None:

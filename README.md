@@ -27,15 +27,36 @@ Menggunakan representasi visual 3D **Processing (P3D)** yang sangat ringan mengg
 
 ---
 
+## 📋 Prasyarat
+
+- **Python 3.10+** (diuji pada 3.14)
+- **Processing 4** (untuk viewer 3D) — https://processing.org/download
+- *(Opsional)* Arduino Uno dengan firmware kating untuk mode Hardware
+
+Install dependensi Python:
+
+```bash
+pip install -r requirements.txt
+```
+
+> `pyserial` hanya dibutuhkan untuk mode Hardware. Tanpa itu, aplikasi tetap
+> bisa dijalankan pada mode Simulasi.
+
+---
+
 ## 🚀 Cara Menjalankan
 
 ### Cara 1: Menggunakan Launcher Otomatis (Paling Mudah)
 * **Dari File Explorer**: Double-click file `run_app.bat`.
 * **Dari Terminal VS Code / PowerShell**:
-  ```powershell
-  .\run_app.bat
-  ```
-  *(atau `python run_app.py`)*
+   ```powershell
+   .\run_app.bat
+   ```
+   *(atau `python run_app.py`)*
+
+   Launcher default membuka **mode Simulasi**. Untuk langsung ke mode
+   Hardware, jalankan `python run_app.py --mode hw`. Agar noise simulasi
+   reproducible (mis. untuk laporan), tambahkan `--seed 42`.
 
 ### Cara 2: Manual
 1. Buka file `BalancingPropellerIMU/BalancingPropellerIMU.pde` di aplikasi Processing, lalu klik tombol **Play (Run ▶)**.
@@ -60,7 +81,21 @@ Menggunakan representasi visual 3D **Processing (P3D)** yang sangat ringan mengg
 
 ---
 
-## 📁 Struktur Modul Proyek
+## 📁 Struktur Folder
+
+```
+VERSI 2/
+├── app/                     # Kode Python (GUI & backend)
+├── BalancingPropellerIMU/   # Sketch Processing 3D viewer (.pde)
+├── docs/                    # Dokumentasi & catatan
+│   └── assets/              # Gambar pendukung (tampak atas/depan/…)
+├── firmware/                # Backup firmware Arduino Uno (.hex)
+├── data/                    # Hasil rekaman CSV (tidak di-commit)
+├── run_app.py / run_app.bat # Launcher
+├── requirements.txt
+├── LICENSE
+└── README.md
+```
 
 ### Python Backend & GUI (`app/`)
 * **`app/main.py`**: Entry point dan inisialisasi aplikasi PySide6.
@@ -71,10 +106,10 @@ Menggunakan representasi visual 3D **Processing (P3D)** yang sangat ringan mengg
 * **`app/widgets/beam_view.py`**: Widget animasi 2D penyeimbang balok.
 * **`app/widgets/controls.py`**: Komponen slider parameter, kartu metrik, dan tombol kontrol.
 
-### Processing 3D Viewer (`BalancingPropellerViewer/`)
-File skrip `.pde` telah dimodularisasi menjadi tab-tab terpisah di aplikasi Processing:
-* **`BalancingPropellerViewer.pde`**: Setup utama, draw loop, dan variabel state telemetri global.
-* **`Network.pde`**: Protokol komunikasi UDP socket, parsing JSON, balasan ACK, dan sinyal impuls.
-* **`Camera.pde`**: Kontrol kamera orbit 3D, pencahayaan scene, lantai grid, serta event mouse & keyboard.
-* **`Model.pde`**: Geometri 3D rakitan alat balancing propeller, baling-baling blur, panah gaya thrust, dan busur derajat.
-* **`HUD.pde`**: Tampilan 2D overlay Heads-Up Display (informasi telemetri, status koneksi, dan notifikasi).
+### Processing 3D Viewer (`BalancingPropellerIMU/`)
+Sketch `.pde` dimodularisasi menjadi beberapa tab di aplikasi Processing:
+* **`BalancingPropellerIMU.pde`**: Setup utama, `draw()` loop, dan variabel state telemetri global.
+* **`NetworkIMU.pde`**: Protokol komunikasi UDP socket, parsing JSON, balasan ACK, dan pengiriman sinyal impuls.
+* **`CameraIMU.pde`**: Kontrol kamera orbit 3D, pencahayaan scene, lantai grid, serta event mouse & keyboard.
+* **`ModelIMU.pde`**: Geometri 3D rakitan alat balancing propeller, baling-baling blur, panah gaya thrust, dan busur derajat.
+* **`HudIMU.pde`**: Tampilan 2D overlay Heads-Up Display (informasi telemetri, status koneksi, dan notifikasi).

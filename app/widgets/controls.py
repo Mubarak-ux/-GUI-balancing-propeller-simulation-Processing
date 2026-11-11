@@ -73,6 +73,11 @@ class Param(QtWidgets.QWidget):
         self.sl.blockSignals(False)
         self.sb.blockSignals(False)
 
+    def set_locked(self, locked):
+        """Kunci/buka input: slider & spinbox dinonaktifkan, label tetap jelas."""
+        self.sl.setEnabled(not locked)
+        self.sb.setEnabled(not locked)
+
 
 # ----------------------------------------------------------------------------
 # KOMPONEN KARTU
@@ -102,6 +107,7 @@ class Card(QtWidgets.QFrame):
             sub = QtWidgets.QLabel(subtitle)
             sub.setObjectName("CardSub")
             head.addWidget(sub)
+        self.head = head          # akses header dari luar (mis. tombol gembok)
         outer.addLayout(head)
 
         self.body = QtWidgets.QVBoxLayout()

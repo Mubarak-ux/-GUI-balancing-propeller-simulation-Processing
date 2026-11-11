@@ -108,10 +108,12 @@ class ProcessingStream:
         """'connected'  : ACK diterima (Processing menerima data)
         'no-ack'     : paket terkirim, tetapi Processing tidak membalas ACK
         'no-listener': tidak ada yang listen di port UDP tujuan
-        'idle'       : belum pernah mengirim
+        'idle'       : belum pernah mengirim paket
         """
         if self.healthy:
             return "connected"
+        if self.last_send == 0.0:
+            return "idle"
         if self.sent_recently:
             return "no-ack"
         return "no-listener"

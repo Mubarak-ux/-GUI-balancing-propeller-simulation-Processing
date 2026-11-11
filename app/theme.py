@@ -62,6 +62,14 @@ QPushButton#Danger {{ background: #FDECEC; border-color: #F3C2C0; color: #B42318
 QPushButton#Danger:hover {{ background: #FBDCDC; }}
 QPushButton#Warning {{ background: #E9F0FE; border-color: #C5D8FD; color: {ACCENT_DARK}; }}
 QPushButton#Warning:hover {{ background: #DCE8FD; }}
+QPushButton#Lock {{
+    background: transparent; border: 1px solid #D5DCE5; border-radius: 6px;
+    padding: 2px 4px; font-size: 13px;
+}}
+QPushButton#Lock:hover {{ background: #EEF1F5; border-color: #C3CBD6; }}
+QPushButton#Lock:checked {{
+    background: #FFF4D6; border-color: #E9D48A;
+}}
 QPushButton:disabled, QPushButton#Primary:disabled, QPushButton#Danger:disabled,
 QPushButton#Warning:disabled {{
     background: #F1F3F6; border-color: #E1E5EB; color: #A8B0BC;
