@@ -1,0 +1,37 @@
+VERSI 2/
+├── app/                             # Backend simulasi, kontrol PID, dan GUI Python
+│   ├── assets/                      # Aset gambar & grafis antarmuka
+│   │   ├── logo_trik_ugm.jpg        # Banner logo resmi TRIK & UGM
+│   │   └── strukturPY.txt           # File struktur pohon direktori proyek ini
+│   ├── widgets/                     # Komponen UI kustom dan visualisasi balok 2D
+│   │   ├── beam_view.py             # Widget visualisasi 2D interaktif (sentak impuls)
+│   │   ├── controls.py              # Komponen kartu metrik, slider parameter, & input
+│   │   └── __init__.py
+│   ├── config.py                    # Konfigurasi palet warna dan parameter UI
+│   ├── hw_backend.py                # Backend pembacaan serial USB hardware Arduino Uno
+│   ├── hw_stream.py                 # Telemetri streaming data hardware via UDP
+│   ├── main.py                      # Titik masuk utama aplikasi PySide6
+│   ├── main_window.py               # Jendela utama dengan plot real-time & kontrol PID
+│   ├── metrics.py                   # Algoritma perhitungan metrik respon transien
+│   ├── processing_stream.py         # Pengirim telemetri UDP ke viewer Processing 3D
+│   ├── sim_backend.py               # Model matematika dinamika fisika seesaw & motor
+│   ├── theme.py                     # Stylesheet QSS tema antarmuka modern
+│   └── __init__.py
+├── BalancingPropellerIMU/            # Sketch visualizer 3D Processing (P3D HiDPI)
+│   ├── BalancingPropellerIMU.pde    # Setup utama, draw loop, dan state telemetri
+│   ├── CameraIMU.pde                # Navigasi kamera orbit 3D, pencahayaan, mouse & keyboard
+│   ├── HudIMU.pde                   # Heads-Up Display 2D tajam (panel status & grafik sudut)
+│   ├── ModelIMU.pde                 # Geometri 3D rakitan alat, baling-baling, IMU GY-521, ESC
+│   └── NetworkIMU.pde               # Komunikasi socket UDP port 9999 & validasi ACK
+├── data/                            # Folder penyimpanan log rekaman data CSV
+├── docs/                            # Dokumentasi teknis & laporan proyek
+│   ├── assets/                      # Foto referensi tampak atas, depan, samping, bawah
+│   ├── pengukuran_b.md              # Laporan identifikasi koefisien redaman b
+│   ├── ringkasan_pengukuran.md      # Data terukur parameter fisik alat nyata
+│   ├── versi2.md                    # Laporan upgrade dan komparasi VERSI 1 vs VERSI 2
+│   └── README.md                    # Indeks panduan dokumentasi
+├── firmware/                        # Berkas firmware cadangan Arduino Uno (.hex)
+├── requirements.txt                 # Daftar dependensi library Python
+├── README.md                        # Dokumentasi utama proyek & panduan pengoperasian
+├── run_app.bat                      # Launcher 1-klik Windows (Processing 3D + GUI Python)
+└── run_app.py                       # Skrip launcher utama Python (Simulasi & Hardware)
