@@ -18,7 +18,7 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
-:: Jalankan launcher utama Python (otomatis membuka 3D Viewer & GUI)
+:: Jalankan launcher utama Python (GUI saja; viewer 3D dibuka lewat tombol di GUI)
 echo Menjalankan aplikasi Balancing Propeller...
 python "%~dp0run_app.py" %*
 

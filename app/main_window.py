@@ -15,6 +15,7 @@ from .config import (ACCENT, AMBER, BORDER, GREEN, MUTED, PLOT_BG, PURPLE,
 from .metrics import (COL_D, COL_I, COL_MEAS, COL_P, COL_SP, COL_T, COL_TH,
                       COL_U, COL_W, DASH, METRIC_KEYS, compute_metrics)
 from .hw_backend import DATA_DIR, HAVE_SERIAL, HardwareBackend, list_ports
+from .processing_launcher import start_processing
 from .sim_backend import SimBackend
 from .widgets.beam_view import BeamView
 from .widgets.controls import Card, Metric, Param
@@ -255,6 +256,13 @@ class MainWindow(QtWidgets.QMainWindow):
         pl.addWidget(self.pill_dot)
         pl.addWidget(self.pill_txt)
         hl.addWidget(pill)
+
+        self.btn_open3d = QtWidgets.QPushButton("\U0001f5a5  Buka 3D")
+        self.btn_open3d.setObjectName("Primary")
+        self.btn_open3d.setToolTip("Jalankan viewer 3D Processing (BalancingPropellerIMU).\n"
+                                   "Kompilasi butuh beberapa detik; jendela 3D muncul sendiri.")
+        self.btn_open3d.clicked.connect(self.open_3d_viewer)
+        hl.addWidget(self.btn_open3d)
 
         wrap = QtWidgets.QWidget()
         wv = QtWidgets.QVBoxLayout(wrap)
@@ -1125,6 +1133,34 @@ class MainWindow(QtWidgets.QMainWindow):
         "no-listener": ("PROCESSING  \u00b7  no listener", RED),
         "idle": ("PROCESSING  \u00b7  connecting\u2026", MUTED),
     }
+    def open_3d_viewer(self):
+        """Jalankan viewer 3D Processing dari tombol header."""
+        ok, msg = start_processing(editor_only=False, wait=False)
+        self.btn_open3d.setToolTip(msg)
+        if ok:
+            self._open3d_waits = 40     # poll s/d ~40 s (kompilasi bisa lama)
+            self.btn_open3d.setEnabled(False)
+            self.btn_open3d.setText("\u23f3  3D dimulai\u2026")
+            QtCore.QTimer.singleShot(1000, self._poll_open3d)
+        else:
+            QtWidgets.QMessageBox.warning(self, "Tidak bisa membuka 3D", msg)
+
+    def _poll_open3d(self):
+        """Tunggu ACK dari viewer 3D; baru aktifkan lagi tombol bila gagal."""
+        if self.stream.healthy:
+            self.btn_open3d.setEnabled(False)
+            self.btn_open3d.setText("\u2713  3D aktif")
+            self.btn_open3d.setToolTip("Viewer 3D Processing sedang terhubung.")
+            self._open3d_waits = 0
+            return
+        self._open3d_waits -= 1
+        if self._open3d_waits > 0:
+            QtCore.QTimer.singleShot(1000, self._poll_open3d)
+        else:
+            self.btn_open3d.setEnabled(True)
+            self.btn_open3d.setText("\U0001f5a5  Buka 3D")
+            self.btn_open3d.setToolTip(
+                "Viewer 3D belum merespons. Klik lagi untuk mencoba ulang.")
 
     def _update_connection_status(self):
         state = self.stream.status
@@ -1134,6 +1170,12 @@ class MainWindow(QtWidgets.QMainWindow):
         text, color = self.CONN_LABEL[state]
         self.pill_dot.setStyleSheet(f"color: {color}; font-size: 12px;")
         self.pill_txt.setText(text)
+        # Viewer 3D putus -> aktifkan lagi tombol buka, supaya bisa
+        # dijalankan ulang tanpa restart aplikasi.
+        if state != "connected" and not self.btn_open3d.isEnabled() \
+                and self.btn_open3d.text().startswith("\u2713"):
+            self.btn_open3d.setEnabled(True)
+            self.btn_open3d.setText("\U0001f5a5  Buka 3D")
 
     # ------------------------------------------------------------------
     # METRIK

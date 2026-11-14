@@ -1,12 +1,14 @@
 /**
  * ============================================================================
- * BALANCING PROPELLER - IMU LIVE VIEWER (HARDWARE ASLI)
+ * BALANCING PROPELLER - VIEWER 3D (SIMULASI & HARDWARE)
  * ============================================================================
- * Representasi 3D alat ASLI. Sketch ini HANYA TAMPILAN:
- *   Uno (firmware kating) --USB--> GUI Python --UDP 9999--> sketch ini
+ * Representasi 3D alat, dipakai untuk mode Simulasi maupun Hardware. Sketch
+ * ini HANYA TAMPILAN:
+ *   Simulasi : GUI Python --UDP 9999--> sketch ini
+ *   Hardware : Uno (firmware kating) --USB--> GUI Python --UDP 9999--> sketch ini
  *
  * Pemilihan port, kolom sudut, nol-kan, balik arah, dan perekaman data
- * semuanya diatur di GUI Python (kartu "Sumber Data", mode Hardware).
+ * semuanya diatur di GUI Python (kartu "Sumber Data").
  *
  * Struktur modul:
  * - BalancingPropellerIMU.pde : setup(), draw()
@@ -37,15 +39,34 @@ void settings() {
 }
 
 void setup() {
-  surface.setTitle("Balancing Propeller - IMU Live (Hardware Asli)");
+  surface.setTitle("Balancing Propeller - Menunggu GUI"); 
   surface.setResizable(true);
   frameRate(60);
   initHud();
   initNetwork();
 }
 
+// Judul jendela menyesuaikan sumber data: Simulasi / Hardware / menunggu GUI.
+String lastTitle = "";
+
+void updateWindowTitle() {
+  String title;
+  if (!guiConnected()) {
+    title = "Balancing Propeller - Menunggu GUI";
+  } else if (srcMode.equals("hw")) {
+    title = "Balancing Propeller - IMU Live (Hardware Asli)";
+  } else {
+    title = "Balancing Propeller - Simulasi";
+  }
+  if (!title.equals(lastTitle)) {
+    surface.setTitle(title);
+    lastTitle = title;
+  }
+}
+
 void draw() {
   pollUDP();
+  updateWindowTitle();
 
   boolean live = dataLive();
   angleHist[histIdx] = targetTheta;

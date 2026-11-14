@@ -23,7 +23,7 @@ Menggunakan representasi visual 3D **Processing (P3D)** yang sangat ringan mengg
 5. **Perhitungan Metrik Respon Transien Otomatis**:
    - Menghitung otomatis: *Overshoot %*, *Rise Time*, *Settling Time*, *Steady-State Error*, dan *Peak Time*.
 6. **Launcher 1-Klik (`run_app.bat` / `run_app.py`)**:
-   - Sekali klik langsung membuka viewer 3D (Processing) dan GUI Python (PySide6) secara bersamaan, mendukung mode Simulasi dan Hardware fisik.
+   - Membuka GUI Python (PySide6) saja saat start; viewer 3D Processing (termasuk mode Hardware fisik) dijalankan kapan saja lewat tombol **"Buka 3D"** di header GUI, atau otomatis dengan flag `--3d`.
 
 ---
 
@@ -54,16 +54,19 @@ pip install -r requirements.txt
    ```
    *(atau `python run_app.py`)*
 
-   Launcher default membuka **mode Simulasi**. Untuk langsung ke mode
-   Hardware, jalankan `python run_app.py --mode hw`. Agar noise simulasi
-   reproducible (mis. untuk laporan), tambahkan `--seed 42`.
+   Launcher default **hanya membuka GUI Python** (mode Simulasi); viewer 3D
+   Processing dibuka belakangan lewat tombol **"Buka 3D"** di header GUI.
+   Untuk langsung menjalankan viewer 3D saat start, gunakan `--3d`. Untuk
+   langsung ke mode Hardware, jalankan `python run_app.py --mode hw`. Agar
+   noise simulasi reproducible (mis. untuk laporan), tambahkan `--seed 42`.
 
 ### Cara 2: Manual
 1. Buka file `BalancingPropellerIMU/BalancingPropellerIMU.pde` di aplikasi Processing, lalu klik tombol **Play (Run ▶)**.
 2. Di terminal folder `VERSI 2`, jalankan:
    ```bash
-   python run_app.py --no-3d
+   python run_app.py
    ```
+   Viewer 3D juga bisa dijalankan dari GUI dengan tombol **"Buka 3D"**.
 
 ---
 
