@@ -60,7 +60,7 @@ void drawApparatusIMU() {
   // 3. BUSUR DERAJAT
   pushMatrix();
   translate(0, -75, 30);
-  drawProtractorArc(100.0, currentTheta);
+  drawProtractorArc(100.0, currentTheta, setpointTheta, isSimMode());
   popMatrix();
 
   // 4. POROS
@@ -202,7 +202,7 @@ void drawEsc(float x) {
 // ----------------------------------------------------------------------------
 // BUSUR DERAJAT
 // ----------------------------------------------------------------------------
-void drawProtractorArc(float radius, float curDeg) {
+void drawProtractorArc(float radius, float curDeg, float spDeg, boolean showSetpoint) {
   pushMatrix();
   noFill();
 
@@ -222,6 +222,20 @@ void drawProtractorArc(float radius, float curDeg) {
          sin(rad) * (radius + 6), -cos(rad) * (radius + 6), 0);
   }
 
+  // jarum setpoint (amber), hanya saat mode simulasi
+  if (showSetpoint) {
+    float spRad = radians(constrain(spDeg, -STOP_DEG, STOP_DEG));
+    stroke(241, 196, 15, 235);
+    strokeWeight(1.6);
+    line(0, 0, 0, sin(spRad) * (radius + 12), -cos(spRad) * (radius + 12), 0);
+
+    // penanda kecil di ujung jarum setpoint
+    fill(241, 196, 15);
+    noStroke();
+    ellipse(sin(spRad) * (radius + 12), -cos(spRad) * (radius + 12), 4, 4);
+  }
+
+  // jarum sudut aktual (cyan) digambar terakhir agar selalu terlihat
   float curRad = radians(constrain(curDeg, -STOP_DEG, STOP_DEG));
   stroke(0, 230, 255, 230);
   strokeWeight(2.0);

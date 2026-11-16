@@ -266,17 +266,31 @@ class HardwareBackend:
 
     def start_recording(self, label=""):
         self.stop_recording()
-        os.makedirs(DATA_DIR, exist_ok=True)
         safe = re.sub(r"[^A-Za-z0-9_-]+", "_", label.strip()).strip("_")[:40]
         name = time.strftime("hw_%Y%m%d_%H%M%S") + (f"_{safe}" if safe else "") + ".csv"
         path = os.path.join(DATA_DIR, name)
-        f = open(path, "w", newline="", encoding="utf-8")
-        w = csv.writer(f)
-        w.writerow(["# label", label])
-        w.writerow(["# port", self.port or "", "baud", self.BAUD])
-        w.writerow(["# dimulai", time.strftime("%Y-%m-%d %H:%M:%S")])
-        w.writerow(["t_s", "sudut_uno_f2_deg", "dibalik", "offset_deg", "sudut_deg",
-                    "beban_g", "posisi_beban_cm", "baris_mentah"])
+        f = None
+        try:
+            os.makedirs(DATA_DIR, exist_ok=True)
+            f = open(path, "w", newline="", encoding="utf-8")
+            w = csv.writer(f)
+            w.writerow(["# label", label])
+            w.writerow(["# port", self.port or "", "baud", self.BAUD])
+            w.writerow(["# dimulai", time.strftime("%Y-%m-%d %H:%M:%S")])
+            w.writerow(["t_s", "sudut_uno_f2_deg", "dibalik", "offset_deg", "sudut_deg",
+                        "beban_g", "posisi_beban_cm", "baris_mentah"])
+            f.flush()
+        except OSError:
+            if f is not None:
+                try:
+                    f.close()
+                except Exception:
+                    pass
+            try:
+                os.remove(path)       # buang file parsial
+            except OSError:
+                pass
+            raise
         with self._rec_lock:
             self._rec_file, self._rec_writer = f, w
             self.rec_path, self.rec_label = path, label

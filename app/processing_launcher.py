@@ -123,9 +123,40 @@ def viewer_responsive(timeout=0.6):
         s.close()
 
 
+def _is_our_viewer(pid):
+    """True jika ``pid`` adalah Processing/java yang menjalankan sketch ini.
+
+    Hanya proses seperti itu yang boleh dibunuh saat membersihkan viewer
+    zombie; aplikasi lain yang kebetulan memakai port UDP 9999 tidak boleh
+    ikut dimatikan.
+    """
+    script = (
+        'try { '
+        '$p = Get-CimInstance Win32_Process -Filter "ProcessId=%d" '
+        '-ErrorAction Stop; '
+        'if ($p) { Write-Output ($p.Name + "|" + $p.CommandLine) } '
+        '} catch { }'
+    ) % pid
+    try:
+        out = subprocess.run(
+            ["powershell", "-NoProfile", "-Command", script],
+            capture_output=True, text=True, timeout=10,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    except Exception:
+        return False
+    text = out.stdout.strip()
+    if not text:
+        return False
+    name, _, cmdline = text.partition("|")
+    name = name.strip().lower()
+    if name not in ("processing.exe", "java.exe", "javaw.exe"):
+        return False
+    return "balancingpropellerimu" in (cmdline or "").lower()
+
+
 def _kill_stale_viewers():
-    """Bunuh proses Processing/java yang masih memegang port UDP 9999
-    tetapi tidak merespons (macet/zombie). Return True jika ada yang
+    """Bunuh viewer BalancingPropellerIMU yang masih memegang port UDP
+    9999 tetapi tidak merespons (macet/zombie). Return True jika ada yang
     dibunuh. Hanya berjalan di Windows; platform lain return False.
     """
     import sys
@@ -142,12 +173,21 @@ def _kill_stale_viewers():
         return False
     pids = {p.strip() for p in out.stdout.splitlines() if p.strip().isdigit()}
     killed = False
-    for pid in pids:
+    self_pid = os.getpid()
+    for raw in pids:
         try:
-            subprocess.run(["taskkill", "/PID", pid, "/F"],
-                           capture_output=True, timeout=10,
-                           creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
-            killed = True
+            pid = int(raw)
+        except ValueError:
+            continue
+        if pid == self_pid or not _is_our_viewer(pid):
+            continue
+        try:
+            res = subprocess.run(
+                ["taskkill", "/PID", str(pid), "/F"],
+                capture_output=True, timeout=10,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+            if res.returncode == 0:
+                killed = True
         except Exception:
             pass
     return killed

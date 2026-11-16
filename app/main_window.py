@@ -366,7 +366,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.band.setZValue(-10)
         self.band.setVisible(False)
         self.p1.addItem(self.band)
-        self._set_angle_range(25)
+        self._set_angle_range(0.0)      # tanpa data -> rentang minimum +-25 deg
 
         self.p2 = pg.PlotWidget(background=PLOT_BG)
         self.p2.setLabel("left", "PID output u", "%")
@@ -793,8 +793,11 @@ class MainWindow(QtWidgets.QMainWindow):
             if not self.hw.receiving:
                 self._last_rec_msg = "\u26a0 Belum ada data dari Uno, rekaman tidak dimulai."
             else:
-                path = self.hw.start_recording(self.ed_label.text())
-                self._last_rec_msg = ""
+                try:
+                    self.hw.start_recording(self.ed_label.text())
+                    self._last_rec_msg = ""
+                except OSError as exc:
+                    self._last_rec_msg = f"\u26a0 Gagal mulai merekam: {exc}"
         self._update_hw_status()
 
     def _open_data_dir(self):
