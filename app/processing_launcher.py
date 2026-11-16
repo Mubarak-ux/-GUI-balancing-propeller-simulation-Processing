@@ -15,7 +15,29 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SKETCH_DIR = os.path.join(BASE_DIR, "BalancingPropellerIMU")
 PDE_PATH = os.path.join(SKETCH_DIR, "BalancingPropellerIMU.pde")
 BUILD_DIR = os.path.join(tempfile.gettempdir(), "BalancingPropellerIMU_build")
+CRASH_LOG_DIR = os.path.join(tempfile.gettempdir(), "BalancingPropellerIMU_crash")
 UDP_PORT = 9999
+
+
+def _processing_env():
+    """Environment untuk proses Processing + JVM sketch.
+
+    Driver OpenGL Intel (igxelpicd64.dll) kadang crash saat JVM sketch
+    ditutup, dan JVM lalu menulis ``hs_err_pid*.log`` ke working directory
+    (= folder proyek). Lewat ``JAVA_TOOL_OPTIONS`` (diwarisi juga oleh JVM
+    sketch yang di-spawn Processing) log itu dipindah ke folder temp.
+    """
+    env = os.environ.copy()
+    try:
+        os.makedirs(CRASH_LOG_DIR, exist_ok=True)
+    except OSError:
+        return env
+    err_file = os.path.join(CRASH_LOG_DIR, "hs_err_pid%p.log")
+    opt = f'-XX:ErrorFile="{err_file}"' if " " in err_file else f"-XX:ErrorFile={err_file}"
+    prev = env.get("JAVA_TOOL_OPTIONS", "")
+    if "ErrorFile" not in prev:
+        env["JAVA_TOOL_OPTIONS"] = (prev + " " + opt).strip()
+    return env
 
 
 def _candidate_processing_paths():
@@ -227,19 +249,24 @@ def start_processing(editor_only=False, wait=True, force=False, kill_stale=True)
                 time.sleep(0.1)
         if not udp_port_free(UDP_PORT) and not force:
             return False, (f"Port UDP {UDP_PORT} masih dipakai proses lain. Tutup "
-                           "program yang memakai port tersebut, atau jalankan lagi "
-                           "dengan opsi paksa.")
+                           "program yang memakai port tersebut (cek Task Manager: "
+                           "java.exe / Processing), lalu coba lagi.")
 
+    env = _processing_env()
+    # Working dir JANGAN BUILD_DIR: "--force" menghapus BUILD_DIR, dan Windows
+    # menolak menghapus folder yang sedang jadi working dir sebuah proses.
+    work_dir = CRASH_LOG_DIR if os.path.isdir(CRASH_LOG_DIR) else None
     try:
+        os.makedirs(BUILD_DIR, exist_ok=True)
         if editor_only:
-            subprocess.Popen([processing_exe, PDE_PATH])
+            subprocess.Popen([processing_exe, PDE_PATH], env=env, cwd=work_dir)
             msg = "Membuka sketch di editor Processing (tekan Run)."
         else:
-            os.makedirs(BUILD_DIR, exist_ok=True)
             subprocess.Popen(
                 [processing_exe, "cli", f"--sketch={SKETCH_DIR}",
                  f"--output={BUILD_DIR}", "--force", "--run"],
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                env=env, cwd=work_dir,
                 creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
             msg = ("Menjalankan viewer 3D (kompilasi butuh beberapa detik; "
                    "jendela 3D muncul sendiri).")

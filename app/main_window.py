@@ -3,6 +3,7 @@
 import collections
 import math
 import os
+import threading
 import time
 
 import numpy as np
@@ -14,7 +15,8 @@ from .config import (ACCENT, AMBER, BORDER, GREEN, MUTED, PLOT_BG, PURPLE,
                      RED)
 from .metrics import (COL_D, COL_I, COL_MEAS, COL_P, COL_SP, COL_T, COL_TH,
                       COL_U, COL_W, DASH, METRIC_KEYS, compute_metrics)
-from .hw_backend import DATA_DIR, HAVE_SERIAL, HardwareBackend, list_ports
+from .hw_backend import (DATA_DIR, HAVE_SERIAL, HardwareBackend, list_ports,
+                         looks_like_esp)
 from .processing_launcher import start_processing
 from .sim_backend import SimBackend
 from .widgets.beam_view import BeamView
@@ -102,9 +104,15 @@ class MainWindow(QtWidgets.QMainWindow):
     PROP_WRAP = 360000.0    # harus sinkron dengan NetworkIMU.PROP_WRAP_PERIOD
     MAX_CATCHUP_S = 0.1     # batas langkah simulasi per tick jika UI tersendat
 
+    # hasil start_processing() dari thread latar -> thread GUI
+    _open3d_done = QtCore.Signal(bool, str)
+
     def __init__(self, seed=None, initial_mode="sim"):
         super().__init__()
         self.setWindowTitle("Balancing Propeller")
+        self._open3d_waits = 0
+        self._open3d_done.connect(self._on_open3d_done)
+        self._calibrating = False   # kalibrasi gyro ESP32 sedang berjalan
         self.sim = SimBackend(seed=seed)
         self.hw = HardwareBackend()
         self.be = self.sim          # backend aktif (sim / hw)
@@ -628,15 +636,15 @@ class MainWindow(QtWidgets.QMainWindow):
         return scroll
 
     # ------------------------------------------------------------------
-    # SUMBER DATA: simulasi / hardware (Arduino Uno, firmware kating)
-    #   Mode hardware = BACA SAJA: tidak ada data yang dikirim ke Uno.
+    # SUMBER DATA: simulasi / hardware (ESP32 + IMU GY-521)
+    #   Tahap 1: ESP32 hanya membaca IMU; motor belum dikendalikan.
     # ------------------------------------------------------------------
     def _build_source_card(self):
         card = Card("Sumber Data", accent=PURPLE)
 
         self.cb_mode = QtWidgets.QComboBox()
         self.cb_mode.addItem("Simulasi", "sim")
-        self.cb_mode.addItem("Hardware (Arduino Uno \u00b7 baca saja)", "hw")
+        self.cb_mode.addItem("Hardware (ESP32 + IMU)", "hw")
         self.cb_mode.currentIndexChanged.connect(
             lambda _: self.set_mode(self.cb_mode.currentData()))
         card.body.addWidget(self.cb_mode)
@@ -653,8 +661,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.cb_port.setMinimumWidth(0)
         self.cb_port.setSizeAdjustPolicy(
             QtWidgets.QComboBox.AdjustToMinimumContentsLengthWithIcon)
-        self.cb_port.setToolTip("Port USB (Arduino) ditaruh paling atas,\n"
-                                "port Bluetooth di bawah.")
+        self.cb_port.setToolTip("Port yang tampak seperti ESP32 (CP210x/CH340)\n"
+                                "ditaruh paling atas, port Bluetooth di bawah.")
         b_refresh = QtWidgets.QPushButton("\u21bb")
         b_refresh.setToolTip("Scan ulang port COM")
         b_refresh.setFixedWidth(34)
@@ -668,12 +676,17 @@ class MainWindow(QtWidgets.QMainWindow):
         g.addWidget(self.btn_conn, row, 3)
         row += 1
 
-        # --- arah sudut (sudut selalu kolom f2 dari Uno) ---
+        # --- arah sudut (sudut selalu kolom f2 dari ESP32) ---
         self.chk_inv = QtWidgets.QCheckBox("Balik arah sudut")
         self.chk_inv.setToolTip("Centang jika arah miring di layar berlawanan\n"
                                 "dengan arah miring batang asli.")
         self.chk_inv.toggled.connect(self._on_mapping)
-        g.addWidget(self.chk_inv, row, 0, 1, 4)
+        self.btn_calib = QtWidgets.QPushButton("Kalibrasi gyro")
+        self.btn_calib.setToolTip("Minta ESP32 menghitung ulang bias gyro (~2 s).\n"
+                                  "DIAMKAN alat selama kalibrasi.")
+        self.btn_calib.clicked.connect(self._calibrate_gyro)
+        g.addWidget(self.chk_inv, row, 0, 1, 2)
+        g.addWidget(self.btn_calib, row, 2, 1, 2)
         row += 1
 
         b_tare = QtWidgets.QPushButton("Nol-kan (0\u00b0)")
@@ -706,7 +719,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.ed_label.setPlaceholderText("Label percobaan, mis. diam_kiri")
         self.btn_rec = QtWidgets.QPushButton("\u25cf  Rekam")
         self.btn_rec.setObjectName("Danger")
-        self.btn_rec.setToolTip("Simpan SEMUA baris data Uno ke CSV di folder data/")
+        self.btn_rec.setToolTip("Simpan SEMUA baris data ESP32 ke CSV di folder data/")
         self.btn_rec.clicked.connect(self._toggle_record)
         g.addWidget(self.ed_label, row, 0, 1, 3)
         g.addWidget(self.btn_rec, row, 3)
@@ -752,7 +765,7 @@ class MainWindow(QtWidgets.QMainWindow):
         else:
             port = self.cb_port.currentData()
             if not port:
-                self.hw.error = "Pilih port COM dulu (colok Uno, lalu \u21bb)."
+                self.hw.error = "Pilih port COM dulu (colok ESP32, lalu \u21bb)."
             else:
                 try:
                     self.hw.connect(port)
@@ -765,6 +778,20 @@ class MainWindow(QtWidgets.QMainWindow):
         self.hw.set_invert(self.chk_inv.isChecked())
         self.hist.clear()
         self._clear_event()
+
+    def _calibrate_gyro(self):
+        if self.hw.calibrate_gyro():
+            self.hw.error = None
+            # tombol dinonaktifkan selama kalibrasi berjalan di ESP32 (~2 s)
+            self._calibrating = True
+            self.btn_calib.setText("Kalibrasi… diamkan")
+            QtCore.QTimer.singleShot(2500, self._calib_done)
+        self._update_hw_status()
+
+    def _calib_done(self):
+        self._calibrating = False
+        self.btn_calib.setText("Kalibrasi gyro")
+        self._update_hw_status()
 
     def _tare(self):
         self.hw.tare()
@@ -791,7 +818,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self._last_rec_msg = f"Tersimpan: {os.path.basename(path)}  ({rows} baris)"
         else:
             if not self.hw.receiving:
-                self._last_rec_msg = "\u26a0 Belum ada data dari Uno, rekaman tidak dimulai."
+                self._last_rec_msg = "\u26a0 Belum ada data dari ESP32, rekaman tidak dimulai."
             else:
                 try:
                     self.hw.start_recording(self.ed_label.text())
@@ -807,6 +834,7 @@ class MainWindow(QtWidgets.QMainWindow):
     def _update_hw_status(self):
         hw = self.hw
         self.btn_conn.setText("Disconnect" if hw.is_open else "Connect")
+        self.btn_calib.setEnabled(hw.is_open and not self._calibrating)
         if not HAVE_SERIAL:
             state = "pyserial belum terpasang \u2192 pip install pyserial"
         elif not hw.is_open:
@@ -815,14 +843,15 @@ class MainWindow(QtWidgets.QMainWindow):
             raw = hw.raw_angle()
             raw_s = "\u2014" if raw is None else f"{raw:+.2f}\u00b0"
             state = (f"\u25cf Data masuk {hw.rate_hz:.0f} Hz dari {hw.port}  \u00b7  "
-                     f"sudut Uno {raw_s}  \u00b7  offset {hw.offset:+.2f}\u00b0")
+                     f"sudut ESP32 {raw_s}  \u00b7  offset {hw.offset:+.2f}\u00b0")
         else:
-            state = (f"{hw.port} terbuka, menunggu data\u2026  (Uno reset & "
-                     "menyiapkan ESC \u00b17 s setiap port dibuka)")
+            state = (f"{hw.port} terbuka, menunggu data\u2026  (pastikan firmware "
+                     "esp32_imu_test sudah di-upload & baud 115200; tekan EN "
+                     "di board jika perlu)")
         if hw.bad_lines:
             state += f"\nBaris rusak: {hw.bad_lines}"
         if hw.other_lines:
-            state += f"\nPesan Uno: {hw.other_lines[-1]}"
+            state += f"\nPesan ESP32: {hw.other_lines[-1]}"
         if hw.error:
             state += f"\n\u26a0 {hw.error}"
         self.hw_status.setText(state)
@@ -838,8 +867,12 @@ class MainWindow(QtWidgets.QMainWindow):
         else:
             self.btn_rec.setText("\u25cf  Rekam")
             self.ed_label.setEnabled(True)
-            self.rec_status.setText(self._last_rec_msg or "Tidak merekam")
-            self.rec_status.setStyleSheet("")
+            if hw.rec_error:
+                self.rec_status.setText(f"⚠ Rekaman berhenti: {hw.rec_error}")
+                self.rec_status.setStyleSheet(f"color: {AMBER};")
+            else:
+                self.rec_status.setText(self._last_rec_msg or "Tidak merekam")
+                self.rec_status.setStyleSheet("")
 
         # data tambahan untuk Processing
         self.stream.extra = {
@@ -855,18 +888,17 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _apply_initial_mode(self, mode):
         """Pilih mode awal (dari launcher) dan, untuk hardware, port yang
-        terlihat seperti Arduino/USB tanpa campur tangan pengguna."""
+        terlihat seperti ESP32 tanpa campur tangan pengguna."""
         if mode == "hw":
             i = self.cb_mode.findData("hw")
             if i >= 0:
                 self.cb_mode.setCurrentIndex(i)
             for k in range(self.cb_port.count()):
-                text = self.cb_port.itemText(k).lower()
-                if any(s in text for s in ("arduino", "ch340", "usb serial", "usb-serial")):
+                if looks_like_esp(self.cb_port.itemText(k)):
                     self.cb_port.setCurrentIndex(k)
                     break
             else:
-                self.cb_port.insertItem(0, "(pilih port Uno \u2014 colok USB lalu \u21bb)", None)
+                self.cb_port.insertItem(0, "(pilih port ESP32 \u2014 colok USB lalu \u21bb)", None)
                 self.cb_port.setCurrentIndex(0)
         else:
             i = self.cb_mode.findData("sim")
@@ -885,16 +917,16 @@ class MainWindow(QtWidgets.QMainWindow):
         self.be.set_gains(self.kp.value(), self.ki.value(), self.kd.value())
         self.hw_box.setVisible(hw)
         # Mode hardware: PID, setpoint, noise, impuls & skenario tidak berlaku
-        # (motor dikendalikan firmware kating). Slider beban tetap aktif
-        # sebagai keterangan beban fisik.
+        # (tahap 1: ESP32 hanya membaca IMU, motor belum dikendalikan).
+        # Slider beban tetap aktif sebagai keterangan beban fisik.
         for w in (self.sp, self.nz, self.btn_disturb,
                   self.btn_scn_run, self.btn_step):
             w.setEnabled(not hw)
         # Gain PID mengikuti status gembok (dan terkunci paksa saat mode HW).
         self._apply_pid_lock()
         self.btn_pid_lock.setEnabled(not hw)
-        tip = ("Mode hardware: dikendalikan firmware Uno (kating).\n"
-               "GUI hanya membaca data.") if hw else ""
+        tip = ("Mode hardware (tahap 1): ESP32 hanya membaca IMU,\n"
+               "motor belum dikendalikan dari GUI.") if hw else ""
         self.sp.setToolTip(tip)
         self.view.setToolTip("" if hw else
                              "Klik pada sisi kiri atau kanan batang untuk "
@@ -1136,9 +1168,39 @@ class MainWindow(QtWidgets.QMainWindow):
         "no-listener": ("PROCESSING  \u00b7  no listener", RED),
         "idle": ("PROCESSING  \u00b7  connecting\u2026", MUTED),
     }
+
     def open_3d_viewer(self):
-        """Jalankan viewer 3D Processing dari tombol header."""
-        ok, msg = start_processing(editor_only=False, wait=False)
+        """Jalankan viewer 3D Processing dari tombol header.
+
+        ``start_processing`` bisa makan beberapa detik (PowerShell untuk
+        membersihkan viewer zombie, menunggu port lepas), jadi dijalankan
+        di thread terpisah supaya GUI tidak membeku. Hasilnya kembali ke
+        thread GUI lewat signal ``_open3d_done``.
+        """
+        if self.stream.healthy:
+            # viewer sudah terhubung -> jangan probe/bunuh apa pun
+            self._set_open3d_active()
+            return
+        self.btn_open3d.setEnabled(False)
+        self.btn_open3d.setText("\u23f3  Memeriksa\u2026")
+
+        def work():
+            try:
+                ok, msg = start_processing(editor_only=False, wait=False)
+            except Exception as exc:          # jaga-jaga: tombol jangan macet
+                ok, msg = False, f"Gagal membuka Processing: {exc}"
+            self._open3d_done.emit(ok, msg)
+
+        threading.Thread(target=work, name="open3d", daemon=True).start()
+
+    def _set_open3d_active(self):
+        self.btn_open3d.setEnabled(False)
+        self.btn_open3d.setText("\u2713  3D aktif")
+        self.btn_open3d.setToolTip("Viewer 3D Processing sedang terhubung.")
+        self._open3d_waits = 0
+
+    @QtCore.Slot(bool, str)
+    def _on_open3d_done(self, ok, msg):
         self.btn_open3d.setToolTip(msg)
         if ok:
             self._open3d_waits = 40     # poll s/d ~40 s (kompilasi bisa lama)
@@ -1146,15 +1208,14 @@ class MainWindow(QtWidgets.QMainWindow):
             self.btn_open3d.setText("\u23f3  3D dimulai\u2026")
             QtCore.QTimer.singleShot(1000, self._poll_open3d)
         else:
+            self.btn_open3d.setEnabled(True)
+            self.btn_open3d.setText("\U0001f5a5  Buka 3D")
             QtWidgets.QMessageBox.warning(self, "Tidak bisa membuka 3D", msg)
 
     def _poll_open3d(self):
         """Tunggu ACK dari viewer 3D; baru aktifkan lagi tombol bila gagal."""
         if self.stream.healthy:
-            self.btn_open3d.setEnabled(False)
-            self.btn_open3d.setText("\u2713  3D aktif")
-            self.btn_open3d.setToolTip("Viewer 3D Processing sedang terhubung.")
-            self._open3d_waits = 0
+            self._set_open3d_active()
             return
         self._open3d_waits -= 1
         if self._open3d_waits > 0:

@@ -5,7 +5,7 @@
  * Representasi 3D alat, dipakai untuk mode Simulasi maupun Hardware. Sketch
  * ini HANYA TAMPILAN:
  *   Simulasi : GUI Python --UDP 9999--> sketch ini
- *   Hardware : Uno (firmware kating) --USB--> GUI Python --UDP 9999--> sketch ini
+ *   Hardware : ESP32 + IMU --USB--> GUI Python --UDP 9999--> sketch ini
  *
  * Pemilihan port, kolom sudut, nol-kan, balik arah, dan perekaman data
  * semuanya diatur di GUI Python (kartu "Sumber Data").

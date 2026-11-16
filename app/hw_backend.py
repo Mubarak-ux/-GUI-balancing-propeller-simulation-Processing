@@ -1,18 +1,22 @@
-"""Backend hardware: membaca data Arduino Uno (firmware kating) lewat USB Serial.
+"""Backend hardware: membaca data ESP32 + IMU GY-521 (MPU6050) lewat USB Serial.
 
-WEEK 1 - KOLEKSI DATA, MODE BACA SAJA
-    * Firmware Uno TIDAK diubah dan TIDAK ADA satu byte pun yang dikirim
-      ke Uno (tidak ada ``ser.write``).
-    * Motor dikendalikan sepenuhnya oleh firmware kating; GUI hanya
-      membaca, menampilkan, dan merekam.
+TAHAP 1 - BACA IMU
+    * Firmware: ``firmware/esp32_imu_test/esp32_imu_test.ino``.
+    * ESP32 hanya membaca IMU; motor/ESC belum dikendalikan. GUI
+      membaca, menampilkan, dan merekam. Satu-satunya data yang dikirim
+      ke ESP32 adalah perintah ``c`` (kalibrasi ulang bias gyro).
 
-Format baris dari Uno (115200 baud, diakhiri newline):
+Format baris dari ESP32 (115200 baud, diakhiri newline):
     *,f1,f2,f3,f4,f5,f6,f7,f8,#
+      f1 sudut sumbu lain (deg)     f2 SUDUT BATANG (deg)
+      f3 laju sudut batang (deg/s)  f4..f6 ax, ay, az (g)
+      f7 suhu IMU (degC)            f8 laju loop baca IMU (Hz)
 contoh:
-    *,0.00,-21.88,0.00,50.00,978,781,4,21.88,#
-Sudut batang = kolom f2 (sudah dipastikan dengan alat asli). Kolom lain
-tidak ditampilkan, tetapi baris mentah tetap disimpan utuh di CSV
-(kolom ``baris_mentah``) sebagai cadangan.
+    *,0.41,-12.37,3.05,0.012,-0.214,0.976,31.2,500,#
+Arah/tanda sudut diatur di firmware (``BEAM_AXIS``/``BEAM_SIGN``) atau
+dengan "Balik arah" di GUI. Baris mentah tetap disimpan utuh di CSV
+(kolom ``baris_mentah``). Baris yang tidak diawali ``*`` adalah pesan
+teks firmware (status kalibrasi, error I2C).
 
 Interface dibuat mirip ``SimBackend`` supaya MainWindow bisa memakai
 keduanya secara bergantian.
@@ -36,22 +40,35 @@ except ImportError:          # pyserial belum di-install
     serial = None
     HAVE_SERIAL = False
 
-ANGLE_FIELD = 2              # f2 = sudut batang (deg), dipastikan dengan alat asli
+ANGLE_FIELD = 2              # f2 = sudut batang (deg)
+RATE_FIELD = 3               # f3 = laju sudut batang dari gyro (deg/s)
 DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data")
+
+# Kata kunci deskripsi port yang menandakan board ESP32: chip USB-serial
+# yang umum di DevKit (CP210x, CH340/CH910x, FTDI) dan USB bawaan S3/C3.
+ESP_PORT_HINTS = ("cp210", "silicon labs", "ch340", "ch910", "ch343", "ch9102",
+                  "usb jtag", "esp32", "usb serial", "usb-serial", "ftdi")
+
+
+def looks_like_esp(desc):
+    d = (desc or "").lower()
+    return any(s in d for s in ESP_PORT_HINTS)
 
 
 def list_ports():
-    """Daftar (device, deskripsi) port serial. Port USB (mis. Arduino)
-    diletakkan paling atas, port Bluetooth paling bawah."""
+    """Daftar (device, deskripsi) port serial. Port yang tampak seperti
+    ESP32 diletakkan paling atas, port Bluetooth paling bawah."""
     if not HAVE_SERIAL:
         return []
     ports = list(serial.tools.list_ports.comports())
-    ports.sort(key=lambda p: ("BTHENUM" in (p.hwid or ""), p.device))
+    ports.sort(key=lambda p: ("BTHENUM" in (p.hwid or ""),
+                              not looks_like_esp(f"{p.description} {p.manufacturer or ''}"),
+                              p.device))
     return [(p.device, f"{p.device}  \u00b7  {p.description}") for p in ports]
 
 
 def parse_line(line):
-    """Parse satu baris ``*,f1,...,fn,#`` dari Uno.
+    """Parse satu baris ``*,f1,...,fn,#`` dari ESP32.
 
     Return list float (panjang n >= 1) atau None jika baris tidak valid.
     """
@@ -75,9 +92,9 @@ class HardwareBackend:
     BAUD = 115200
     STALE_S = 1.0            # tanpa data selama ini -> dianggap terputus
     HISTORY_S = 0.5          # riwayat sampel untuk hitung omega
-    # f2 dari Uno berlawanan tanda dengan konvensi tampilan GUI/Processing,
-    # jadi secara default dibalik (dipastikan dengan alat asli).
-    BASE_SIGN = -1.0
+    # Tanda sudut diatur di firmware ESP32 (BEAM_SIGN), jadi GUI tidak
+    # membalik apa pun secara default; pakai "Balik arah" bila perlu.
+    BASE_SIGN = 1.0
     OMEGA_WIN_S = 0.10       # jendela turunan sudut untuk omega
 
     def __init__(self):
@@ -120,12 +137,13 @@ class HardwareBackend:
         self.rec_label = ""
         self.rec_rows = 0
         self._rec_t0 = 0.0
+        self.rec_error = None     # pesan jika rekaman berhenti karena gagal tulis
 
         self._t0 = time.monotonic()
         self.reset()
 
     # ------------------------------------------------------------------
-    # koneksi (BACA SAJA)
+    # koneksi
     # ------------------------------------------------------------------
     def connect(self, port):
         if not HAVE_SERIAL:
@@ -133,8 +151,9 @@ class HardwareBackend:
         self.disconnect()
         ser = serial.serial_for_url(port, do_not_open=True,
                                     baudrate=self.BAUD, timeout=0.1)
-        # Coba tidak mereset Uno saat port dibuka (DTR/RTS rendah).
-        # Di sebagian driver Uno tetap reset; itu normal.
+        # DTR/RTS rendah: rangkaian auto-reset ESP32 DevKit memakai DTR/RTS
+        # untuk EN & IO0. Dibiarkan rendah supaya ESP32 tidak reset / masuk
+        # mode bootloader saat port dibuka.
         try:
             ser.dtr = False
             ser.rts = False
@@ -171,6 +190,23 @@ class HardwareBackend:
     def is_open(self):
         return self.ser is not None and self.ser.is_open
 
+    def send_command(self, cmd):
+        """Kirim perintah satu karakter ke firmware ESP32. Return True jika
+        terkirim."""
+        if not self.is_open:
+            self.error = "Port belum terbuka."
+            return False
+        try:
+            self.ser.write(cmd.encode("ascii"))
+            return True
+        except Exception as exc:
+            self.error = f"Gagal kirim perintah: {exc}"
+            return False
+
+    def calibrate_gyro(self):
+        """Minta ESP32 menghitung ulang bias gyro (~2 s, alat harus diam)."""
+        return self.send_command("c")
+
     @property
     def receiving(self):
         return self.is_open and (time.monotonic() - self._last_rx) < self.STALE_S
@@ -180,7 +216,7 @@ class HardwareBackend:
         while not self._stop.is_set():
             try:
                 chunk = self.ser.read(self.ser.in_waiting or 1)
-            except Exception as exc:      # kabel dicabut, Uno mati, dll.
+            except Exception as exc:      # kabel dicabut, ESP32 mati, dll.
                 self.error = f"Serial terputus: {exc}"
                 break
             if not chunk:
@@ -277,7 +313,7 @@ class HardwareBackend:
             w.writerow(["# label", label])
             w.writerow(["# port", self.port or "", "baud", self.BAUD])
             w.writerow(["# dimulai", time.strftime("%Y-%m-%d %H:%M:%S")])
-            w.writerow(["t_s", "sudut_uno_f2_deg", "dibalik", "offset_deg", "sudut_deg",
+            w.writerow(["t_s", "sudut_esp_f2_deg", "dibalik", "offset_deg", "sudut_deg",
                         "beban_g", "posisi_beban_cm", "baris_mentah"])
             f.flush()
         except OSError:
@@ -296,6 +332,7 @@ class HardwareBackend:
             self.rec_path, self.rec_label = path, label
             self.rec_rows = 0
             self._rec_t0 = time.monotonic()
+            self.rec_error = None
         return path
 
     def stop_recording(self):
@@ -325,12 +362,23 @@ class HardwareBackend:
             else:
                 raw = f"{vals[i]:g}"
                 ang = f"{self._map(vals):.3f}"
-            w.writerow([f"{now - self._rec_t0:.4f}", raw, int(self.invert),
-                        f"{self.offset:.3f}", ang,
-                        f"{self.load_m * 1000:.0f}", f"{self.load_x * 100:.1f}", text])
-            self.rec_rows += 1
-            if self.rec_rows % 100 == 0:
-                self._rec_file.flush()
+            try:
+                w.writerow([f"{now - self._rec_t0:.4f}", raw, int(self.invert),
+                            f"{self.offset:.3f}", ang,
+                            f"{self.load_m * 1000:.0f}", f"{self.load_x * 100:.1f}", text])
+                self.rec_rows += 1
+                if self.rec_rows % 100 == 0:
+                    self._rec_file.flush()
+            except (OSError, ValueError) as exc:
+                # disk penuh / flashdisk dicabut / file terkunci: hentikan
+                # rekaman saja, thread pembaca serial harus tetap hidup.
+                # (tidak memanggil _close_recording: _rec_lock sedang dipegang)
+                self.rec_error = f"{exc} ({self.rec_rows} baris tersimpan)"
+                try:
+                    self._rec_file.close()
+                except Exception:
+                    pass
+                self._rec_file = self._rec_writer = None
 
     # ------------------------------------------------------------------
     # interface mirip SimBackend
@@ -348,10 +396,10 @@ class HardwareBackend:
         self.p_term = self.i_term = self.d_term = 0.0
 
     def set_gains(self, kp, ki, kd):
-        self.kp, self.ki, self.kd = kp, ki, kd        # tidak dikirim ke Uno
+        self.kp, self.ki, self.kd = kp, ki, kd        # belum dikirim ke ESP32 (tahap 1)
 
     def set_setpoint(self, deg):
-        self.sp = deg                                 # tidak dikirim ke Uno
+        self.sp = deg                                 # belum dikirim ke ESP32 (tahap 1)
 
     def set_load(self, mass_kg, pos_m):
         """Keterangan beban fisik yang terpasang (untuk CSV & tampilan)."""
@@ -394,7 +442,11 @@ class HardwareBackend:
         self.t = time.monotonic() - self._t0
         self.th = math.radians(deg)
         self.meas = deg
-        self.w = math.radians(self._omega(deg))
+        # laju sudut: langsung dari gyro (f3) jika ada -> lebih halus & tanpa
+        # jeda dibanding turunan numerik; fallback ke turunan sudut.
+        r = RATE_FIELD - 1
+        rate = self._sign() * vals[r] if len(vals) > r else self._omega(deg)
+        self.w = math.radians(rate)
         return self.sample()
 
     def sample(self):

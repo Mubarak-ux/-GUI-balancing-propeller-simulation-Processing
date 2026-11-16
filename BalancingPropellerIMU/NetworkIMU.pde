@@ -2,7 +2,7 @@
  * ============================================================================
  * NETWORKIMU.PDE - Penerima Telemetri UDP dari GUI Python
  * ============================================================================
- * Sketch ini TIDAK membuka port serial. Semua data (sudut, kolom mentah Uno,
+ * Sketch ini TIDAK membuka port serial. Semua data (sudut, kolom mentah ESP32,
  * status port, status rekam) datang dari GUI Python lewat UDP port 9999,
  * sama seperti BalancingPropellerViewer. Setiap paket dibalas "ack" supaya
  * GUI tahu Processing aktif.
@@ -10,7 +10,7 @@
  * Kunci JSON yang dipakai:
  *   th, sp, load_m, load_x          (sama dengan viewer simulasi)
  *   mode  "sim" / "hw"
- *   conn  1 jika data Uno masuk
+ *   conn  1 jika data ESP32 masuk
  *   port  nama port, inv, off, rate, rec, lbl
  *
  * Catatan: hanya satu program yang bisa memakai port 9999. Jalankan
@@ -74,7 +74,7 @@ boolean isSimMode() {
   return guiConnected() && !srcMode.equals("hw");
 }
 
-// sudut valid = GUI tersambung DAN (mode simulasi ATAU data Uno masuk)
+// sudut valid = GUI tersambung DAN (mode simulasi ATAU data ESP32 masuk)
 boolean dataLive() {
   return guiConnected() && (!srcMode.equals("hw") || hwConn);
 }
@@ -89,9 +89,21 @@ void pollUDP() {
     try {
       DatagramPacket p = new DatagramPacket(receiveBuffer, receiveBuffer.length);
       socket.receive(p);
+      String msg = new String(p.getData(), 0, p.getLength(), "UTF-8");
+      // Probe "masih hidup?" dari launcher Python: balas ACK langsung ke
+      // pengirimnya. Jangan dijadikan paket "latest" -> tidak menimpa
+      // state GUI dan tidak bisa tertimpa paket GUI di frame yang sama.
+      if (msg.indexOf("\"probe\"") >= 0) {
+        try {
+          socket.send(new DatagramPacket(ackBytes, ackBytes.length, p.getAddress(), p.getPort()));
+        } catch (Exception e2) {
+          // abaikan
+        }
+        continue;
+      }
       addr = p.getAddress();
       port = p.getPort();
-      latest = new String(p.getData(), 0, p.getLength(), "UTF-8");
+      latest = msg;
     } catch (Exception e) {
       break;
     }

@@ -96,16 +96,16 @@ void hudStatusPanel(PGraphics g) {
   else                  guiTxt = "GUI terhubung  \u00b7  mode " + (hw ? "Hardware" : "Simulasi");
   hudText(g, fUiBold, guiTxt, x + 32, y + 20, color(235), LEFT, CENTER);
 
-  // baris 2: Uno
-  int unoC = !gui ? grey : (!hw ? grey : (hwConn ? green : amber));
-  hudDot(g, x + 18, y + 42, unoC);
-  String unoTxt;
-  if (!gui)        unoTxt = "Uno: \u2014";
-  else if (!hw)    unoTxt = "Uno tidak dipakai (mode simulasi)";
-  else if (hwConn) unoTxt = String.format("Uno %s  \u00b7  %.0f Hz", hwPort, hwRate);
-  else             unoTxt = hwPort.length() > 0 ? "Uno " + hwPort + "  \u00b7  menunggu data\u2026"
-                                                : "Uno belum Connect di GUI";
-  hudText(g, fUi, unoTxt, x + 32, y + 42, color(200), LEFT, CENTER);
+  // baris 2: ESP32
+  int espC = !gui ? grey : (!hw ? grey : (hwConn ? green : amber));
+  hudDot(g, x + 18, y + 42, espC);
+  String espTxt;
+  if (!gui)        espTxt = "ESP32: \u2014";
+  else if (!hw)    espTxt = "ESP32 tidak dipakai (mode simulasi)";
+  else if (hwConn) espTxt = String.format("ESP32 %s  \u00b7  %.0f Hz", hwPort, hwRate);
+  else             espTxt = hwPort.length() > 0 ? "ESP32 " + hwPort + "  \u00b7  menunggu data\u2026"
+                                                : "ESP32 belum Connect di GUI";
+  hudText(g, fUi, espTxt, x + 32, y + 42, color(200), LEFT, CENTER);
 
   if (netError != null) {
     hudText(g, fSmall, netError, x + 16, y + 62, color(255, 130, 120), LEFT, CENTER);

@@ -8,7 +8,7 @@ VERSI 2/
 │   │   ├── controls.py              # Komponen kartu metrik, slider parameter, & input
 │   │   └── __init__.py
 │   ├── config.py                    # Konfigurasi palet warna dan parameter UI
-│   ├── hw_backend.py                # Backend pembacaan serial USB hardware Arduino Uno
+│   ├── hw_backend.py                # Backend pembacaan serial USB hardware ESP32 + IMU
 │   ├── hw_stream.py                 # Telemetri streaming data hardware via UDP
 │   ├── main.py                      # Titik masuk utama aplikasi PySide6
 │   ├── main_window.py               # Jendela utama dengan plot real-time & kontrol PID
@@ -30,7 +30,7 @@ VERSI 2/
 │   ├── ringkasan_pengukuran.md      # Data terukur parameter fisik alat nyata
 │   ├── versi2.md                    # Laporan upgrade dan komparasi VERSI 1 vs VERSI 2
 │   └── README.md                    # Indeks panduan dokumentasi
-├── firmware/                        # Berkas firmware cadangan Arduino Uno (.hex)
+├── firmware/                        # Firmware ESP32 (esp32_imu_test: baca IMU)
 ├── requirements.txt                 # Daftar dependensi library Python
 ├── README.md                        # Dokumentasi utama proyek & panduan pengoperasian
 ├── run_app.bat                      # Launcher 1-klik Windows (Processing 3D + GUI Python)

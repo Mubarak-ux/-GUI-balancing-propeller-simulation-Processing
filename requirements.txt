@@ -3,5 +3,5 @@ PySide6>=6.6
 pyqtgraph>=0.13
 numpy>=1.26
 
-# Mode Hardware (opsional): baca data Arduino via USB Serial
+# Mode Hardware (opsional): baca data ESP32 via USB Serial
 pyserial>=3.5

@@ -139,7 +139,7 @@ VERSI 2/
 │   ├── dokumentasiPY.png             # Tangkapan layar GUI Python
 │   ├── dokumentasiPDE.png            # Tangkapan layar visualizer Processing 3D
 │   └── assets/                       # Gambar tampak alat (atas/depan/samping/bawah)
-├── firmware/                         # Backup firmware Arduino Uno (.hex)
+├── firmware/                         # Firmware ESP32 (esp32_imu_test: baca IMU)
 ├── data/                             # Hasil rekaman CSV (tidak di-commit)
 ├── run_app.py                        # Launcher utama Python (Simulasi & Hardware)
 └── run_app.bat                       # Script batch 1-klik untuk Windows (Launcher Utama)

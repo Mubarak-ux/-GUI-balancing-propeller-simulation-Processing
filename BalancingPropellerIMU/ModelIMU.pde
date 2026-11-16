@@ -7,7 +7,7 @@
  *
  * Mode SIMULASI : baling-baling berputar + panah thrust (data dari GUI).
  * Mode HARDWARE : baling-baling diam, tanpa panah thrust (kecepatan motor
- *                 asli tidak terbaca dari Uno, jadi tidak dipalsukan).
+ *                 asli tidak terbaca dari ESP32, jadi tidak dipalsukan).
  * - Ditambah modul IMU (GY-521) di tengah batang dan ESC kuning di lengan,
  *   mengikuti foto alat.
  */
@@ -104,7 +104,7 @@ void drawApparatusIMU() {
 
   // motor & baling-baling
   //   simulasi : berputar mengikuti GUI + piringan blur + panah thrust
-  //   hardware : diam (kecepatan motor asli tidak terbaca dari Uno)
+  //   hardware : diam (kecepatan motor asli tidak terbaca dari ESP32)
   boolean sim = isSimMode();
   pushMatrix();
   translate(-MOTOR_ARM, -BEAM_HEIGHT / 2, 0);

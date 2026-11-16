@@ -23,3 +23,6 @@ data/*.csv
 build/
 *.exe
 
+
+# Hasil kompilasi Arduino/ESP32 (dibuat ulang setiap compile/upload)
+firmware/**/build/

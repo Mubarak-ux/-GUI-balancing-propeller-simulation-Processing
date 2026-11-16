@@ -6,11 +6,11 @@ sehingga ``BalancingPropellerIMU`` tetap bisa membaca, ditambah
 kunci dari ``extra``:
 
     mode  : "sim" / "hw"
-    conn  : 1 jika data Uno sedang masuk
+    conn  : 1 jika data ESP32 sedang masuk
     port  : nama port (mis. "COM19")
     inv   : 1 jika arah dibalik
     off   : offset nol (deg)
-    rate  : laju data Uno (Hz)
+    rate  : laju data ESP32 (Hz)
     rec   : 1 jika sedang merekam
     lbl   : label rekaman
 """
