@@ -10,25 +10,18 @@
 
 Dari `J·θ̈ + b·θ̇ + k·θ = 0` → `b = 2·J·α`
 
-| Simbol | Arti | Nilai |
-|---|---|---|
-| `J` | Momen inersia | 0,0140 kg·m² |
-| `α` | Laju peluruhan amplitudo (hasil fit) | 1,13 – 1,34 /s |
-| `b` | Koefisien redaman | → dicari |
+dengan `J = 0,0140 kg·m²`, sehingga **`b = 0,0280 × α`**.
 
-Dengan `2·J0 = 0,0280`, maka **`b = 0,0280 × α`**.
-
-> **α dari mana?** Fit kurva `A·e^(−αt)` ke data sudut saat ayunan bebas.
-> Manual: `α = ln(A₁/A₂) / Δt` (dua puncak searah).
+> Manual (dua puncak searah): `b = 2·J·ln(A₁/A₂) / Δt`
 
 ---
 
 ## 2. Hasil
 
-| Event | α (1/s) | R² | b = 0,0280·α |
+| Event | α (1/s) | R² | b |
 |---|---|---|---|
-| Dorongan 1 (−4,8°) | 1,3378 ± 0,0342 | 0,922 | 0,0375 |
-| Dorongan 2 (+14,4°) | 1,1335 ± 0,0160 | 0,969 | 0,0317 |
+| Dorongan 1 (−4,8°) | 1,3378 | 0,922 | 0,0375 |
+| Dorongan 2 (+14,4°) | 1,1335 | 0,969 | 0,0317 |
 | **Berbobot (1/σ²)** | — | — | **0,0328 ± 0,0004** |
 
 ### **`b ≈ 0,033 ± 0,002 N·m·s/rad`** (rentang wajar 0,031 – 0,038)

@@ -51,6 +51,10 @@
 #define I2C_HZ         400000      // 400 kHz (turunkan ke 100000 jika kabel panjang)
 #define MPU_ADDR       0x68        // 0x69 jika pin AD0 dihubungkan ke 3V3
 
+#define LED_PIN        2           // D2 / GPIO2 (LED onboard DevKit V1)
+#define LED_OK_MS      500         // kedip lambat  = normal (toggle tiap 500 ms)
+#define LED_ERR_MS     100         // kedip cepat   = ada error baca I2C
+
 #define BAUD           115200
 #define SAMPLE_HZ      500         // laju baca IMU + update filter
 #define OUTPUT_HZ      100         // laju kirim baris ke Serial
@@ -83,6 +87,19 @@ uint32_t loopCount = 0, rateT0 = 0;
 float loopHz = 0;
 uint32_t i2cErrors = 0;
 bool imuOk = false;
+uint32_t lastLedMs = 0, lastErrMs = 0;
+bool ledState = false;
+
+// Kedip LED non-blocking. Cepat selama 1 detik setelah error I2C terakhir.
+void updateLed() {
+  uint32_t ms = millis();
+  uint32_t period = (lastErrMs && (ms - lastErrMs) < 1000) ? LED_ERR_MS : LED_OK_MS;
+  if (ms - lastLedMs >= period) {
+    lastLedMs = ms;
+    ledState = !ledState;
+    digitalWrite(LED_PIN, ledState);
+  }
+}
 
 // ----------------------------- I2C helper ----------------------------------
 bool writeReg(uint8_t reg, uint8_t val) {
@@ -179,6 +196,8 @@ void calibrateGyro() {
 }
 
 void setup() {
+  pinMode(LED_PIN, OUTPUT);
+  digitalWrite(LED_PIN, LOW);
   Serial.begin(BAUD);
   delay(300);
   Serial.println();
@@ -188,6 +207,7 @@ void setup() {
   Wire.setClock(I2C_HZ);
 
   while (!(imuOk = initImu())) {
+    digitalWrite(LED_PIN, !digitalRead(LED_PIN));   // kedip saat IMU belum terdeteksi
     delay(1000);                 // coba terus sampai IMU terdeteksi
   }
   calibrateGyro();
@@ -206,6 +226,8 @@ void loop() {
     if (c == 'c' || c == 'C') calibrateGyro();
   }
 
+  updateLed();
+
   uint32_t now = micros();
   if ((uint32_t)(now - lastSampleUs) < (1000000UL / SAMPLE_HZ)) return;
   float dt = (now - lastSampleUs) * 1e-6f;
@@ -214,6 +236,7 @@ void loop() {
 
   if (!readImu()) {
     i2cErrors++;
+    lastErrMs = millis() | 1;    // tandai waktu error (|1 agar tidak 0)
     if (i2cErrors % 100 == 1) Serial.printf("Error baca I2C (total %lu)\n", (unsigned long)i2cErrors);
     if (i2cErrors % 500 == 0) {  // coba pulihkan bus + sensor
       Wire.end();
