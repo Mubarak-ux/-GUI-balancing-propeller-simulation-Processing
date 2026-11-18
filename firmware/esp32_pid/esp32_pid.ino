@@ -21,7 +21,7 @@
  *        on=1 aktif / 0 mati, sp_raw = setpoint di bingkai sudut firmware (deg),
  *        dir = +1 / -1 (tanda bingkai tampilan GUI terhadap sudut firmware).
  *   M,<kiri>,<kanan>   manual (hanya saat PID mati)
- *   F,<pct>            F-max 8..15 %
+ *   F,<pct>            F-max 8..20 % (batas PID; tes manual M tetap 0..100 %)
  *   Z                  nolkan integral PID
  *   x                  STOP (PID mati, motor 0)
  *   c                  kalibrasi gyro (alat harus diam)
@@ -31,7 +31,7 @@
  *   - Sudut |theta| > CUTOFF_DEG -> PID mati, motor 0.
  *   - Data IMU tidak masuk > IMU_STALE_MS -> PID mati, motor 0.
  *   - PID hanya boleh dinyalakan jika |theta| <= START_MAX_DEG.
- *   - Throttle selalu dijepit 0..Fmax (Fmax <= 15 %).
+ *   - PID dijepit 0..Fmax (Fmax <= 20 %). Tes manual (M) dijepit 0..100 %.
  * ============================================================================
  */
 
@@ -55,7 +55,8 @@
 #define ESC_MAX_US     2000
 #define ESC_ARM_MS     3000
 #define MIN_THROTTLE_PCT 8.0f      // F-min
-#define MAX_THROTTLE_PCT 15.0f     // batas KERAS atas
+#define MAX_THROTTLE_PCT 20.0f     // batas KERAS atas F-max (PID)
+#define MANUAL_MAX_PCT   100.0f    // batas tes motor manual (perintah M)
 #define CMD_TIMEOUT_MS 500
 
 #define CUTOFF_DEG     32.0f       // mati jika |sudut| lebih dari ini
@@ -111,7 +112,7 @@ uint32_t lastLedMs = 0, lastErrMs = 0;
 bool ledState = false;
 
 float thrL = 0, thrR = 0;
-float fmaxPct = MAX_THROTTLE_PCT;
+float fmaxPct = 15.0f;             // F-max aktif (8..20 %), default 15, diatur dari GUI
 uint32_t lastCmdMs = 0;
 char cmdBuf[64];
 uint8_t cmdLen = 0;
@@ -173,9 +174,10 @@ void escTask(void *) {
   }
 }
 
-void setMotors(float l, float r) {
-  l = constrain(l, 0.0f, fmaxPct);
-  r = constrain(r, 0.0f, fmaxPct);
+// Tulis throttle kedua motor, dijepit ke 0..cap (%).
+void setMotorsCap(float l, float r, float cap) {
+  l = constrain(l, 0.0f, cap);
+  r = constrain(r, 0.0f, cap);
   thrL = l; thrR = r;
   escDutyL = usToDuty(ESC_MIN_US + (ESC_MAX_US - ESC_MIN_US) * l / 100.0f);
   escDutyR = usToDuty(ESC_MIN_US + (ESC_MAX_US - ESC_MIN_US) * r / 100.0f);
@@ -184,6 +186,9 @@ void setMotors(float l, float r) {
     ESC_WRITE(PIN_MOTOR_R, 1, escDutyR);
   }
 }
+
+// PID & keadaan normal: dijepit ke F-max.
+void setMotors(float l, float r) { setMotorsCap(l, r, fmaxPct); }
 
 void pidOff(const char *why) {
   bool was = pidOn;
@@ -242,14 +247,14 @@ void handleCommand(const char *s) {
     if (pidOn) { Serial.println("M diabaikan: PID aktif."); return; }
     float l = 0, r = 0;
     if (sscanf(s + 2, "%f,%f", &l, &r) == 2) {
-      setMotors(l, r);
+      setMotorsCap(l, r, MANUAL_MAX_PCT);   // tes manual: 0..100 %, tidak dibatasi F-max
       lastCmdMs = millis();
     }
   } else if (s[0] == 'F' && s[1] == ',') {
     float f = 0;
     if (sscanf(s + 2, "%f", &f) == 1) {
       fmaxPct = constrain(f, MIN_THROTTLE_PCT, MAX_THROTTLE_PCT);
-      setMotors(thrL, thrR);
+      if (pidOn) setMotors(thrL, thrR);     // jepit ulang hanya untuk PID
       Serial.printf("F-max = %.1f %%\n", fmaxPct);
     }
   } else if (s[0] == 'Z') {                 // nolkan integral (dipakai saat trim diubah)

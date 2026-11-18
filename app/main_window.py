@@ -11,8 +11,8 @@ import pyqtgraph as pg
 from PySide6 import QtCore, QtGui, QtWidgets
 
 from .hw_stream import TelemetryStream
-from .config import (ACCENT, AMBER, BORDER, GREEN, MUTED, PLOT_BG, PURPLE,
-                     RED)
+from .config import (ACCENT, AMBER, BORDER, GREEN, INK, MUTED, PLOT_BG,
+                     PURPLE, RED)
 from .metrics import (COL_D, COL_I, COL_MEAS, COL_P, COL_SP, COL_T, COL_TH,
                       COL_U, COL_W, DASH, METRIC_KEYS, compute_metrics)
 from .hw_backend import (DATA_DIR, HAVE_SERIAL, HardwareBackend, list_ports,
@@ -20,7 +20,7 @@ from .hw_backend import (DATA_DIR, HAVE_SERIAL, HardwareBackend, list_ports,
 from .processing_launcher import start_processing
 from .sim_backend import SimBackend
 from .widgets.beam_view import BeamView
-from .widgets.controls import Card, Metric, Param
+from .widgets.controls import Card, Metric, Param, Readout, Section
 
 Qt = QtCore.Qt
 
@@ -163,6 +163,7 @@ class MainWindow(QtWidgets.QMainWindow):
         rv.setContentsMargins(0, 0, 0, 0)
         rv.setSpacing(0)
         rv.addWidget(self._build_header())
+        rv.addWidget(self._build_readout())
 
         body = QtWidgets.QWidget()
         bl = QtWidgets.QHBoxLayout(body)
@@ -223,7 +224,7 @@ class MainWindow(QtWidgets.QMainWindow):
         hl.setContentsMargins(18, 8, 18, 8)
         hl.setSpacing(10)
 
-        logo = QtWidgets.QLabel("P")
+        logo = QtWidgets.QLabel("BP")
         logo.setObjectName("Logo")
         logo.setFixedSize(30, 30)
         logo.setAlignment(Qt.AlignCenter)
@@ -277,7 +278,7 @@ class MainWindow(QtWidgets.QMainWindow):
         pl.addWidget(self.pill_txt)
         hl.addWidget(pill)
 
-        self.btn_open3d = QtWidgets.QPushButton("\U0001f5a5  Buka 3D")
+        self.btn_open3d = QtWidgets.QPushButton("Buka viewer 3D")
         self.btn_open3d.setObjectName("Primary")
         self.btn_open3d.setToolTip("Jalankan viewer 3D Processing (BalancingPropellerIMU).\n"
                                    "Kompilasi butuh beberapa detik; jendela 3D muncul sendiri.")
@@ -289,10 +290,6 @@ class MainWindow(QtWidgets.QMainWindow):
         wv.setContentsMargins(0, 0, 0, 0)
         wv.setSpacing(0)
         wv.addWidget(hdr)
-        strip = QtWidgets.QFrame()
-        strip.setFixedHeight(3)
-        strip.setStyleSheet(f"background: {ACCENT};")
-        wv.addWidget(strip)
         return wrap
 
     # ------------------------------------------------------------------
@@ -300,11 +297,11 @@ class MainWindow(QtWidgets.QMainWindow):
     # ------------------------------------------------------------------
     def _style_plot(self, pl):
         for ax in ("left", "bottom"):
-            pl.getAxis(ax).setPen(pg.mkPen("#D8DEE7"))
+            pl.getAxis(ax).setPen(pg.mkPen(BORDER))
             pl.getAxis(ax).setTextPen(pg.mkPen(MUTED))
         pl.hideButtons()
         pl.setMenuEnabled(False)
-        pl.showGrid(x=True, y=True, alpha=0.15)
+        pl.showGrid(x=True, y=True, alpha=0.10)
 
     def _make_event_marker(self, plot):
         """InfiniteLine vertikal yang menandai saat setpoint/beban berubah."""
@@ -369,10 +366,10 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # ---------- Tab: Response (angle + PID output) ----------
         self.p1 = pg.PlotWidget(background=PLOT_BG)
-        self.p1.setLabel("left", "Angle \u03b8", "\u00b0")
+        self.p1.setLabel("left", "Sudut \u03b8", "\u00b0")
         self._make_legend(self.p1)
-        self.c_meas = self._curve(self.p1, pen=pg.mkPen("#9AA3AF", width=1), name="IMU")
-        self.c_th = self._curve(self.p1, pen=pg.mkPen(ACCENT, width=2), name="\u03b8 actual")
+        self.c_meas = self._curve(self.p1, pen=pg.mkPen("#B9BCB6", width=1), name="IMU mentah")
+        self.c_th = self._curve(self.p1, pen=pg.mkPen(INK, width=2), name="\u03b8 aktual")
         self.c_sp = self._curve(self.p1, pen=pg.mkPen(ACCENT, width=1.6, style=Qt.DashLine),
                                 name="Setpoint")
         # garis batas mekanik
@@ -381,7 +378,7 @@ class MainWindow(QtWidgets.QMainWindow):
         # band toleransi settling
         self.band = pg.LinearRegionItem(values=(0, 0), orientation="horizontal",
                                         movable=False,
-                                        brush=pg.mkBrush(47, 111, 237, 25),
+                                        brush=pg.mkBrush(217, 72, 15, 22),
                                         pen=pg.mkPen(ACCENT, width=0))
         self.band.setZValue(-10)
         self.band.setVisible(False)
@@ -389,8 +386,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self._set_angle_range(0.0)      # tanpa data -> rentang minimum +-25 deg
 
         self.p2 = pg.PlotWidget(background=PLOT_BG)
-        self.p2.setLabel("left", "PID output u", "%")
-        self.p2.setLabel("bottom", "Time", "s")
+        self.p2.setLabel("left", "Keluaran PID u", "%")
+        self.p2.setLabel("bottom", "Waktu", "s")
         self.p2.setYRange(-110, 110)
         self.p2.setXLink(self.p1)
         self.c_u = self._curve(self.p2, pen=pg.mkPen(GREEN, width=1.8))
@@ -398,11 +395,11 @@ class MainWindow(QtWidgets.QMainWindow):
         # ---------- Tab: PID term breakdown ----------
         self.p3 = pg.PlotWidget(background=PLOT_BG)
         self.p3.setLabel("left", "Kontribusi", "%")
-        self.p3.setLabel("bottom", "Time", "s")
+        self.p3.setLabel("bottom", "Waktu", "s")
         self.p3.setYRange(-110, 110)
         self.p3.setXLink(self.p1)
         self._make_legend(self.p3)
-        self.c_pt = self._curve(self.p3, pen=pg.mkPen(ACCENT, width=1.8), name="P")
+        self.c_pt = self._curve(self.p3, pen=pg.mkPen(INK, width=1.8), name="P")
         self.c_it = self._curve(self.p3, pen=pg.mkPen(GREEN, width=1.8), name="I")
         self.c_dt = self._curve(self.p3, pen=pg.mkPen(PURPLE, width=1.8), name="D")
         self.c_ut = self._curve(self.p3, pen=pg.mkPen("#8A94A3", width=1.4, style=Qt.DashLine),
@@ -417,7 +414,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.p5 = pg.PlotWidget(background=PLOT_BG)
         self.p5.setLabel("left", "\u03c9", "\u00b0/s")
-        self.p5.setLabel("bottom", "Time", "s")
+        self.p5.setLabel("bottom", "Waktu", "s")
         self.p5.setXLink(self.p1)
         self.c_omega = self._curve(self.p5, pen=pg.mkPen(PURPLE, width=1.8))
 
@@ -437,14 +434,14 @@ class MainWindow(QtWidgets.QMainWindow):
 
         tabs = QtWidgets.QTabWidget()
         tabs.setDocumentMode(True)
-        tabs.addTab(stack(self.p1, self.p2), "Response")
-        tabs.addTab(stack(self.p3), "PID Terms")
+        tabs.addTab(stack(self.p1, self.p2), "Respons")
+        tabs.addTab(stack(self.p3), "Suku PID")
         tabs.addTab(stack(self.p4, self.p5), "Error && \u03c9")
-        tabs.addTab(self._build_tuning_log_tab(), "Tuning Log")
-        tabs.addTab(self._build_scenario_tab(), "Skenario Otomatis")
+        tabs.addTab(self._build_tuning_log_tab(), "Log tuning")
+        tabs.addTab(self._build_scenario_tab(), "Skenario otomatis")
         self.tabs = tabs
 
-        telemetry = Card("Telemetry")
+        telemetry = Card("Telemetri", "jendela 10 s terakhir")
         telemetry.body.addWidget(tabs, 1)
 
         left = QtWidgets.QSplitter(Qt.Vertical)
@@ -540,13 +537,15 @@ class MainWindow(QtWidgets.QMainWindow):
 
         pv.addWidget(self._build_source_card())
 
-        controller = Card("PID")
+        controller = Card("Kontrol PID", "Kp \u00b7 Ki \u00b7 Kd")
+        # aksi utama mode hardware (disembunyikan di mode simulasi)
+        controller.body.addWidget(self.btn_pid_run)
         # Tombol gembok di header kartu: kunci/buka slider gain PID.
         self.btn_pid_lock = QtWidgets.QPushButton()
         self.btn_pid_lock.setObjectName("Lock")
         self.btn_pid_lock.setCheckable(True)
         self.btn_pid_lock.setChecked(True)
-        self.btn_pid_lock.setFixedWidth(34)
+        self.btn_pid_lock.setFixedWidth(54)
         self.btn_pid_lock.clicked.connect(self.toggle_pid_lock)
         controller.head.addWidget(self.btn_pid_lock)
         # Rentang slider disesuaikan dengan model terukur (docs/pengukuran/ringkasan_pengukuran.md):
@@ -563,7 +562,7 @@ class MainWindow(QtWidgets.QMainWindow):
             w.changed.connect(self.on_gains)
         pv.addWidget(controller)
 
-        ref = Card("Input", accent=ACCENT)
+        ref = Card("Masukan", "setpoint")
         self.sp = Param("Setpoint", -SP_LIMIT, SP_LIMIT, 0, 1, "\u00b0", 1)
         self.lm = Param("Load mass", 0, 500, 0, 10, "g", 0)
         self.lx = Param("Load position", 5, 15, 10, 1, "cm", 1)
@@ -578,8 +577,8 @@ class MainWindow(QtWidgets.QMainWindow):
             ref.body.addWidget(w)
         pv.addWidget(ref)
 
-        metrics = Card("Performa Respons")
-        self.mt_event = QtWidgets.QLabel("Waiting for setpoint / load change")
+        metrics = Card("Performa respons", "Karakteristik System")
+        self.mt_event = QtWidgets.QLabel("Menunggu perubahan setpoint / beban")
         self.mt_event.setObjectName("EventLabel")
         self.mt_event.setWordWrap(True)
         metrics.body.addWidget(self.mt_event)
@@ -593,6 +592,8 @@ class MainWindow(QtWidgets.QMainWindow):
             mg.addWidget(m, i // 2, i % 2)
         metrics.body.addLayout(mg)
         pv.addWidget(metrics)
+        pv.addWidget(self.hw_adv_card)
+        self.hw_adv_card.setVisible(False)
 
         grid = QtWidgets.QGridLayout()
         grid.setSpacing(7)
@@ -614,7 +615,7 @@ class MainWindow(QtWidgets.QMainWindow):
                                  f"(maks {SP_LIMIT:.0f}\u00b0)  (Ctrl+\u2191)")
         self.btn_step.clicked.connect(self.step_sp)
 
-        self.btn_disturb = QtWidgets.QPushButton("💥  Sentak Gangguan (Impuls)")
+        self.btn_disturb = QtWidgets.QPushButton("Sentak gangguan (impuls)")
         self.btn_disturb.setToolTip("Beri sentakan gangguan torsi mendadak pada batang (Tombol D / Space di Processing)")
         self.btn_disturb.clicked.connect(lambda: self.trigger_impulse(2.5))
 
@@ -624,23 +625,6 @@ class MainWindow(QtWidgets.QMainWindow):
         grid.addWidget(self.btn_step, 1, 1)
         grid.addWidget(self.btn_disturb, 2, 0, 1, 2)
         pv.addLayout(grid)
-
-        # Banner Logo Afiliasi (TRIK - SV UGM)
-        logo_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "logo_trik_ugm.jpg")
-        if os.path.exists(logo_path):
-            card_logo = QtWidgets.QFrame()
-            card_logo.setObjectName("Card")
-            cl_layout = QtWidgets.QVBoxLayout(card_logo)
-            cl_layout.setContentsMargins(8, 8, 8, 8)
-            cl_layout.setSpacing(0)
-
-            lbl_logo = QtWidgets.QLabel()
-            lbl_logo.setAlignment(Qt.AlignCenter)
-            pix = QtGui.QPixmap(logo_path)
-            if not pix.isNull():
-                lbl_logo.setPixmap(pix.scaled(305, 70, Qt.KeepAspectRatio, Qt.SmoothTransformation))
-            cl_layout.addWidget(lbl_logo)
-            pv.addWidget(card_logo)
 
         pv.addStretch(1)
         scroll.setWidget(panel)
@@ -654,7 +638,7 @@ class MainWindow(QtWidgets.QMainWindow):
     #   Tahap 1: ESP32 hanya membaca IMU; motor belum dikendalikan.
     # ------------------------------------------------------------------
     def _build_source_card(self):
-        card = Card("Sumber Data", accent=PURPLE)
+        card = Card("Sumber data", "simulasi / alat asli")
 
         self.cb_mode = QtWidgets.QComboBox()
         self.cb_mode.addItem("Simulasi", "sim")
@@ -663,43 +647,91 @@ class MainWindow(QtWidgets.QMainWindow):
             lambda _: self.set_mode(self.cb_mode.currentData()))
         card.body.addWidget(self.cb_mode)
 
+        # Mode hardware: blok koneksi selalu terlihat (tingkat 1-2),
+        # pengaturan jarang dipakai dilipat dalam seksi (tingkat 3).
         self.hw_box = QtWidgets.QWidget()
-        g = QtWidgets.QGridLayout(self.hw_box)
+        hv = QtWidgets.QVBoxLayout(self.hw_box)
+        hv.setContentsMargins(0, 0, 0, 0)
+        hv.setSpacing(4)
+
+        # ---------------- koneksi (selalu terlihat) ----------------
+        conn = QtWidgets.QWidget()
+        g = QtWidgets.QGridLayout(conn)
         g.setContentsMargins(0, 0, 0, 0)
         g.setHorizontalSpacing(6)
         g.setVerticalSpacing(6)
-        row = 0
-
-        # --- port ---
         self.cb_port = QtWidgets.QComboBox()
         self.cb_port.setMinimumWidth(0)
         self.cb_port.setSizeAdjustPolicy(
             QtWidgets.QComboBox.AdjustToMinimumContentsLengthWithIcon)
         self.cb_port.setToolTip("Port yang tampak seperti ESP32 (CP210x/CH340)\n"
                                 "ditaruh paling atas, port Bluetooth di bawah.")
-        b_refresh = QtWidgets.QPushButton("\u21bb")
-        b_refresh.setToolTip("Scan ulang port COM")
-        b_refresh.setFixedWidth(34)
-        b_refresh.clicked.connect(self._refresh_ports)
-        self.btn_conn = QtWidgets.QPushButton("Connect")
-        self.btn_conn.setObjectName("Primary")
-        self.btn_conn.clicked.connect(self._toggle_connect)
-        # Nama port CH340/CP210x panjang -> combo diberi lebar fleksibel
-        # (boleh menyusut, teks dipotong) supaya tidak melebarkan panel.
+        # Nama port CH340/CP210x panjang -> combo boleh menyusut (teks dipotong)
         self.cb_port.setMinimumContentsLength(6)
         self.cb_port.setSizePolicy(QtWidgets.QSizePolicy.Ignored,
                                    QtWidgets.QSizePolicy.Fixed)
+        b_refresh = QtWidgets.QPushButton("Scan")
+        b_refresh.setToolTip("Scan ulang port COM")
+        b_refresh.clicked.connect(self._refresh_ports)
+        self.btn_conn = QtWidgets.QPushButton("Connect")
+        self.btn_conn.setObjectName("Primary")
         self.btn_conn.setMinimumWidth(92)   # muat untuk "Disconnect"
-        g.addWidget(QtWidgets.QLabel("Port"), row, 0)
-        g.addWidget(self.cb_port, row, 1, 1, 3)
-        row += 1
-        g.addWidget(b_refresh, row, 0)
-        g.addWidget(self.btn_conn, row, 1, 1, 3)
-        row += 1
+        self.btn_conn.clicked.connect(self._toggle_connect)
+        g.addWidget(self.cb_port, 0, 0, 1, 4)
+        g.addWidget(b_refresh, 1, 0)
+        g.addWidget(self.btn_conn, 1, 1, 1, 3)
         g.setColumnStretch(1, 1)
         g.setColumnStretch(3, 1)
+        self.hw_status = QtWidgets.QLabel()
+        self.hw_status.setObjectName("EventLabel")
+        self.hw_status.setWordWrap(True)
+        self.hw_status.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        g.addWidget(self.hw_status, 2, 0, 1, 4)
+        hv.addWidget(conn)
 
-        # --- arah sudut (sudut selalu kolom f2 dari ESP32) ---
+        # tombol utama PID dibuat di sini, ditempatkan di kartu "Kontrol PID"
+        self.pid_run = False
+        self.btn_pid_run = QtWidgets.QPushButton("▶  AKTIFKAN PID")
+        self.btn_pid_run.setObjectName("Hero")
+        self.btn_pid_run.setToolTip("Kontrol sudut batang oleh ESP32 (firmware esp32_pid).\n"
+                                    "Soft-start ~1,7 s, lalu motor bekerja di sekitar bias\n"
+                                    "(8 + F-max)/2. Setpoint & Kp/Ki/Kd diambil dari panel.")
+        self.btn_pid_run.clicked.connect(self._toggle_pid_run)
+        self.btn_pid_run.setVisible(False)
+
+        # Pengaturan tingkat 3 dikumpulkan di kartu terpisah (ditaruh di bawah
+        # kartu PID & performa oleh _build_panel), hanya tampil di hardware.
+        self.hw_adv_card = Card("Pengaturan alat", "setting")
+        adv = self.hw_adv_card.body
+        adv.setSpacing(0)
+
+        # ---------------- seksi: penyetelan PID alat ----------------
+        sec_pid = Section("Penyetelan PID alat", expanded=True)
+        self.trim = Param("Trim", -60.0, 60.0, 0.0, 1.0, "%", 1)
+        self.trim.setToolTip("Feedforward u (%) yang selalu ditambahkan ke keluaran PID.\n"
+                             "Isi dengan nilai I saat batang sudah diam di setpoint\n"
+                             "(tombol di bawah) agar respons tidak lambat/berayun.")
+        self.trim.changed.connect(self._on_trim_changed)
+        sec_pid.add(self.trim, 0)
+        self.btn_trim_from_i = QtWidgets.QPushButton("Trim ← nilai I sekarang")
+        self.btn_trim_from_i.setToolTip("Pindahkan nilai integral saat ini ke Trim, lalu nolkan\n"
+                                        "integral. Pakai saat PID aktif dan batang sudah tenang.")
+        self.btn_trim_from_i.clicked.connect(self._trim_from_integral)
+        sec_pid.add(self.btn_trim_from_i, 1)
+        self.cut = Param("Batas mati", 29.0, 33.0, 32.0, 0.5, "°", 1)
+        self.cut.setToolTip("Jika |sudut| melebihi nilai ini saat PID aktif, ESP32\n"
+                            "mematikan PID dan kedua motor. Batas mekanik rig ±33°.")
+        self.cut.changed.connect(self._on_cutoff_changed)
+        sec_pid.add(self.cut, 2)
+        self.btn_cut_off = QtWidgets.QPushButton("Batas mati: AKTIF")
+        self.btn_cut_off.setToolTip("Matikan/hidupkan batas mati sudut. Saat dimatikan,\n"
+                                    "PID tidak berhenti walau batang menyentuh batas mekanik.")
+        self.btn_cut_off.clicked.connect(self._toggle_cutoff)
+        sec_pid.add(self.btn_cut_off, 3)
+        adv.addWidget(sec_pid)
+
+        # ---------------- seksi: sensor ----------------
+        sec_sensor = Section("Sensor IMU")
         self.chk_inv = QtWidgets.QCheckBox("Balik arah sudut")
         self.chk_inv.setToolTip("Centang jika arah miring di layar berlawanan\n"
                                 "dengan arah miring batang asli.")
@@ -708,86 +740,68 @@ class MainWindow(QtWidgets.QMainWindow):
         self.btn_calib.setToolTip("Minta ESP32 menghitung ulang bias gyro (~2 s).\n"
                                   "DIAMKAN alat selama kalibrasi.")
         self.btn_calib.clicked.connect(self._calibrate_gyro)
-        g.addWidget(self.chk_inv, row, 0, 1, 2)
-        g.addWidget(self.btn_calib, row, 2, 1, 2)
-        row += 1
-
-        b_tare = QtWidgets.QPushButton("Nol-kan (0\u00b0)")
-        b_tare.setToolTip("Jadikan posisi batang sekarang sebagai 0\u00b0.\n"
+        sec_sensor.add(self.chk_inv, 0, 0, 1, 2)
+        sec_sensor.add(self.btn_calib, 0, 2, 1, 2)
+        b_tare = QtWidgets.QPushButton("Nol-kan (0°)")
+        b_tare.setToolTip("Jadikan posisi batang sekarang sebagai 0°.\n"
                           "Tahan batang dalam posisi datar dulu.")
         b_tare.clicked.connect(self._tare)
         b_untare = QtWidgets.QPushButton("Hapus offset")
         b_untare.clicked.connect(self._untare)
-        g.addWidget(b_tare, row, 0, 1, 2)
-        g.addWidget(b_untare, row, 2, 1, 2)
-        row += 1
-
-        self.hw_status = QtWidgets.QLabel()
-        self.hw_status.setObjectName("EventLabel")
-        self.hw_status.setWordWrap(True)
-        g.addWidget(self.hw_status, row, 0, 1, 4)
-        row += 1
-
-        # --- beban fisik ---
+        sec_sensor.add(b_tare, 1, 0, 1, 2)
+        sec_sensor.add(b_untare, 1, 2, 1, 2)
+        # beban fisik: tidak dipakai di hardware (disembunyikan, tetap ada
+        # karena dipakai _on_hw_load)
         self.chk_load = QtWidgets.QCheckBox("Beban fisik terpasang")
-        self.chk_load.setToolTip("Isi massa & posisi beban yang BENAR-BENAR dipasang\n"
-                                 "di batang. Hanya dicatat ke CSV & ditampilkan;\n"
-                                 "tidak mempengaruhi alat.")
         self.chk_load.toggled.connect(self._on_hw_load)
-        g.addWidget(self.chk_load, row, 0, 1, 4)
-        row += 1
-
-        # --- hardware tidak memakai beban simulasi: sembunyikan & nonaktifkan ---
         self.chk_load.setChecked(False)
         self.chk_load.setVisible(False)
+        sec_sensor.add(self.chk_load, 2)
+        adv.addWidget(sec_sensor)
 
-        # --- F-max: batas atas throttle motor (8 % .. 15 %) ---
+        # ---------------- seksi: batas motor F-max ----------------
+        sec_fmax = Section("Batas motor (F-max)")
         self.fmax_unlocked = False
-        self.fmax = Param("F-max", 8.0, 15.0, 15.0, 0.5, "%", 1)
-        self.fmax.setToolTip("Throttle maksimum yang boleh dipakai motor (8–15 %).\n"
-                             "Slider tes motor dibatasi sampai nilai ini, dan nilai\n"
-                             "ini juga dikirim ke ESP32 sebagai batas keselamatan.")
+        self.fmax = Param("F-max", 8.0, 20.0, 15.0, 0.5, "%", 1)
+        self.fmax.setToolTip("Throttle maksimum yang boleh dipakai PID (8–20 %).\n"
+                             "Dikirim ke ESP32 sebagai batas keselamatan PID.\n"
+                             "Tes motor manual TIDAK dibatasi F-max (0–100 %).")
         self.fmax.set_locked(True)
         self.fmax.changed.connect(self._on_fmax_changed)
-        g.addWidget(self.fmax, row, 0, 1, 4)
-        row += 1
-        self.btn_fmax_lock = QtWidgets.QPushButton("\U0001f512  Buka kunci F-max…")
+        sec_fmax.add(self.fmax, 0)
+        self.btn_fmax_lock = QtWidgets.QPushButton("Buka kunci F-max…")
         self.btn_fmax_lock.setToolTip("Mengubah F-max butuh konfirmasi, hanya bisa saat motor\n"
                                       "berhenti, dan terkunci lagi otomatis setelah 15 detik.")
         self.btn_fmax_lock.clicked.connect(self._toggle_fmax_lock)
-        g.addWidget(self.btn_fmax_lock, row, 0, 1, 4)
-        row += 1
-        # info daya koreksi PID untuk F-max yang dipilih
+        sec_fmax.add(self.btn_fmax_lock, 1)
         self.lb_authority = QtWidgets.QLabel()
         self.lb_authority.setObjectName("EventLabel")
         self.lb_authority.setWordWrap(True)
-        g.addWidget(self.lb_authority, row, 0, 1, 4)
-        row += 1
+        sec_fmax.add(self.lb_authority, 2)
         self.fmax_relock = QtCore.QTimer(self)
         self.fmax_relock.setSingleShot(True)
         self.fmax_relock.setInterval(15000)
         self.fmax_relock.timeout.connect(self._lock_fmax)
+        adv.addWidget(sec_fmax)
 
-        # --- tes motor (ukur Fmax F1/F2) ---
+        # ---------------- seksi: tes motor manual ----------------
+        sec_motor = Section("Tes motor manual")
         self.chk_motor = QtWidgets.QCheckBox("Aktifkan tes motor")
         self.chk_motor.setToolTip("Butuh firmware esp32_pid.\n"
                                   "HATI-HATI: baling-baling berputar!")
         self.chk_motor.toggled.connect(self._on_motor_enable)
-        g.addWidget(self.chk_motor, row, 0, 1, 4)
-        row += 1
+        sec_motor.add(self.chk_motor, 0)
         self.sl_motor = []
         self.lb_motor = []
         self.bar_motor = []
+        r = 1
         for name in ("Kiri (CCW, IO26)", "Kanan (CW, IO25)"):
             lb = QtWidgets.QLabel(f"{name}: 0 %")
+            lb.setObjectName("ParamLabel")
             sl = QtWidgets.QSlider(Qt.Horizontal)
             sl.setRange(0, 1000)          # 0.1 % per langkah
             sl.setEnabled(False)
             sl.valueChanged.connect(self._on_motor_slider)
-            g.addWidget(lb, row, 0, 1, 4)
-            row += 1
-            g.addWidget(sl, row, 0, 1, 4)
-            row += 1
             # indikator PWM: panjang bar = throttle, teks = pulsa & duty cycle
             bar = QtWidgets.QProgressBar()
             bar.setRange(0, 1000)
@@ -795,8 +809,10 @@ class MainWindow(QtWidgets.QMainWindow):
             bar.setAlignment(Qt.AlignCenter)
             bar.setToolTip("Sinyal PWM ke ESC (50 Hz): pulsa 1000 µs = 0 %,\n"
                            "2000 µs = 100 %. Duty = pulsa / 20 ms.")
-            g.addWidget(bar, row, 0, 1, 4)
-            row += 1
+            sec_motor.add(lb, r)
+            sec_motor.add(sl, r + 1)
+            sec_motor.add(bar, r + 2)
+            r += 3
             self.lb_motor.append((lb, name))
             self.sl_motor.append(sl)
             self.bar_motor.append(bar)
@@ -804,74 +820,35 @@ class MainWindow(QtWidgets.QMainWindow):
         self.btn_motor_stop.setObjectName("Danger")
         self.btn_motor_stop.setEnabled(False)
         self.btn_motor_stop.clicked.connect(self._motor_stop)
-        g.addWidget(self.btn_motor_stop, row, 0, 1, 4)
-        row += 1
-        # --- kontrol PID (butuh firmware esp32_pid) ---
-        self.pid_run = False
-        self.btn_pid_run = QtWidgets.QPushButton("▶  Aktifkan PID")
-        self.btn_pid_run.setObjectName("Primary")
-        self.btn_pid_run.setToolTip("Kontrol sudut batang oleh ESP32 (butuh firmware esp32_pid).\n"
-                                    "Motor berputar di sekitar bias 11 %, rentang 8–F-max.\n"
-                                    "Setpoint & gain Kp/Ki/Kd diambil dari panel ini.")
-        self.btn_pid_run.clicked.connect(self._toggle_pid_run)
-        g.addWidget(self.btn_pid_run, row, 0, 1, 4)
-        row += 1
-        # trim / feedforward: melawan torsi tetap (batang berat sebelah,
-        # thrust kiri-kanan beda) supaya integral tidak perlu "menunggu".
-        self.trim = Param("Trim", -60.0, 60.0, 0.0, 1.0, "%", 1)
-        self.trim.setToolTip("Feedforward u (%) yang selalu ditambahkan ke keluaran PID.\n"
-                             "Isi dengan nilai I saat batang sudah diam di setpoint\n"
-                             "(tombol di bawah) agar respons tidak lambat/berayun.")
-        self.trim.changed.connect(self._on_trim_changed)
-        g.addWidget(self.trim, row, 0, 1, 4)
-        row += 1
-        self.btn_trim_from_i = QtWidgets.QPushButton("Trim ← nilai I sekarang")
-        self.btn_trim_from_i.setToolTip("Pindahkan nilai integral saat ini ke Trim, lalu nolkan\n"
-                                        "integral. Pakai saat PID aktif dan batang sudah tenang.")
-        self.btn_trim_from_i.clicked.connect(self._trim_from_integral)
-        g.addWidget(self.btn_trim_from_i, row, 0, 1, 4)
-        row += 1
-        # batas mati sudut: motor dimatikan jika |sudut| melebihi nilai ini
-        self.cut = Param("Batas mati", 29.0, 33.0, 32.0, 0.5, "°", 1)
-        self.cut.setToolTip("Jika |sudut| melebihi nilai ini saat PID aktif, ESP32\n"
-                            "mematikan PID dan kedua motor. Batas mekanik rig ±33°.")
-        self.cut.changed.connect(self._on_cutoff_changed)
-        g.addWidget(self.cut, row, 0, 1, 4)
-        row += 1
-        self.btn_cut_off = QtWidgets.QPushButton("Batas mati: AKTIF")
-        self.btn_cut_off.setToolTip("Matikan/hidupkan batas mati sudut. Saat dimatikan,\n"
-                                    "PID tidak berhenti walau batang menyentuh batas mekanik.")
-        self.btn_cut_off.clicked.connect(self._toggle_cutoff)
-        g.addWidget(self.btn_cut_off, row, 0, 1, 4)
-        row += 1
+        sec_motor.add(self.btn_motor_stop, r)
+        adv.addWidget(sec_motor)
+
         # heartbeat: firmware mematikan motor jika perintah berhenti
         self.motor_timer = QtCore.QTimer(self)
         self.motor_timer.timeout.connect(self._motor_heartbeat)
         self.motor_timer.start(100)
         self._apply_fmax(self.fmax.value())   # batasi slider motor & isi indikator PWM
 
-        # --- perekaman ---
+        # ---------------- seksi: rekam data ----------------
+        sec_rec = Section("Rekam data CSV", expanded=True)
         self.ed_label = QtWidgets.QLineEdit()
-        self.ed_label.setPlaceholderText("Label percobaan, mis. diam_kiri")
-        self.btn_rec = QtWidgets.QPushButton("\u25cf  Rekam")
+        self.ed_label.setPlaceholderText("Label percobaan, mis. step_10_pid321")
+        self.btn_rec = QtWidgets.QPushButton("●  Rekam")
         self.btn_rec.setObjectName("Danger")
         self.btn_rec.setToolTip("Simpan SEMUA baris data ESP32 ke CSV di folder data/")
         self.btn_rec.clicked.connect(self._toggle_record)
-        g.addWidget(self.ed_label, row, 0, 1, 3)
-        g.addWidget(self.btn_rec, row, 3)
-        row += 1
-
+        sec_rec.add(self.ed_label, 0, 0, 1, 3)
+        sec_rec.add(self.btn_rec, 0, 3, 1, 1)
         self.rec_status = QtWidgets.QLabel()
         self.rec_status.setObjectName("EventLabel")
         self.rec_status.setWordWrap(True)
         self.rec_status.setTextInteractionFlags(Qt.TextSelectableByMouse)
         b_folder = QtWidgets.QPushButton("Buka folder data")
         b_folder.clicked.connect(self._open_data_dir)
-        g.addWidget(self.rec_status, row, 0, 1, 3)
-        g.addWidget(b_folder, row, 3)
-        row += 1
+        sec_rec.add(self.rec_status, 1, 0, 1, 3)
+        sec_rec.add(b_folder, 1, 3, 1, 1)
+        adv.addWidget(sec_rec)
 
-        g.setColumnStretch(1, 1)
         card.body.addWidget(self.hw_box)
         self.hw_box.setVisible(False)
 
@@ -882,17 +859,84 @@ class MainWindow(QtWidgets.QMainWindow):
         self._update_hw_status()
         return card
 
+    # ------------------------------------------------------------------
+    # STRIP PEMBACAAN UTAMA (tingkat hierarki 1)
+    # ------------------------------------------------------------------
+    def _build_readout(self):
+        bar = QtWidgets.QFrame()
+        bar.setObjectName("ReadoutBar")
+        lay = QtWidgets.QHBoxLayout(bar)
+        lay.setContentsMargins(4, 0, 14, 0)
+        lay.setSpacing(0)
+        # logo afiliasi (TRIK - SV UGM) di ujung kiri strip pembacaan
+        logo_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                 "assets", "logo_trik_ugm.jpg")
+        pix = QtGui.QPixmap(logo_path)
+        if not pix.isNull():
+            logo = QtWidgets.QLabel()
+            logo.setObjectName("ReadoutCell")
+            logo.setPixmap(pix.scaledToHeight(40, Qt.SmoothTransformation))
+            logo.setContentsMargins(10, 4, 14, 4)
+            logo.setToolTip("TRIK · Sekolah Vokasi UGM")
+            lay.addWidget(logo, 0, Qt.AlignVCenter)
+        self.ro_th = Readout("Sudut θ", "°", tooltip="Sudut batang terukur / tersimulasi")
+        self.ro_sp = Readout("Setpoint", "°")
+        self.ro_err = Readout("Error", "°", small=True, tooltip="e = setpoint − θ")
+        self.ro_u = Readout("Keluaran u", "%", small=True, tooltip="Keluaran PID (−100 .. 100 %)")
+        self.ro_f = Readout("Gaya kiri | kanan", "N", small=True, last=True,
+                            tooltip="F1 (kiri) | F2 (kanan)")
+        for w in (self.ro_th, self.ro_sp, self.ro_err, self.ro_u, self.ro_f):
+            lay.addWidget(w)
+        lay.addStretch(1)
+        self.status_chip = QtWidgets.QLabel("SIMULASI")
+        self.status_chip.setObjectName("StatusChip")
+        lay.addWidget(self.status_chip, 0, Qt.AlignVCenter)
+        self._chip_state = None
+        return bar
+
+    def _status(self):
+        """(teks, warna) status alat untuk chip di strip pembacaan."""
+        if self.mode == "sim":
+            return ("SIMULASI · JEDA", AMBER) if self.paused else ("SIMULASI · BERJALAN", GREEN)
+        hw = self.hw
+        if not hw.is_open:
+            return "HARDWARE · TIDAK TERHUBUNG", MUTED
+        if not hw.receiving:
+            return "HARDWARE · MENUNGGU DATA", AMBER
+        if self.pid_run:
+            return ("HARDWARE · PID AKTIF", ACCENT) if hw.pid_active else \
+                   ("HARDWARE · PID MULAI…", AMBER)
+        if self.chk_motor.isChecked() and any(v > 0 for v in self._motor_values()):
+            return "HARDWARE · TES MOTOR", AMBER
+        return "HARDWARE · SIAP TERBANG", GREEN
+
+    def _update_readout(self, s):
+        _t, th, _meas, sp, u, F1, F2 = s[:7]
+        err = sp - th
+        self.ro_th.set(f"{th:+6.2f}")
+        self.ro_sp.set(f"{sp:+6.1f}", ACCENT)
+        self.ro_err.set(f"{err:+6.2f}", AMBER if abs(err) > 3.0 else None)
+        self.ro_u.set(f"{u:+6.1f}", RED if abs(u) >= 99.5 else None)
+        self.ro_f.set(f"{F1:4.2f} | {F2:4.2f}")
+        self._refresh_chip()
+
+    def _refresh_chip(self):
+        if not hasattr(self, "status_chip"):
+            return
+        text, color = self._status()
+        if (text, color) != self._chip_state:
+            self._chip_state = (text, color)
+            self.status_chip.setText(text)
+            self.status_chip.setStyleSheet(f"color:{color}; border:1px solid {color};")
+
     # --- F-max (batas throttle motor) ---
     def _motors_running(self):
         return self.chk_motor.isChecked() and any(v > 0 for v in self._motor_values())
 
     def _apply_fmax(self, v):
         """Terapkan batas F-max ke slider/indikator motor dan kirim ke ESP32."""
-        v = max(8.0, min(15.0, float(v)))
-        top = int(round(v * 10))
-        for s, bar in zip(self.sl_motor, self.bar_motor):
-            s.setRange(0, top)
-            bar.setRange(0, top)
+        v = max(8.0, min(20.0, float(v)))
+        # Slider tes motor manual selalu 0..100 % (tidak ikut F-max).
         self._on_motor_slider()
         if self.hw.is_open:
             self.hw.set_fmax(v)
@@ -902,6 +946,10 @@ class MainWindow(QtWidgets.QMainWindow):
         if v < 12.0:
             txt += ("\n⚠ F-max kecil: daya koreksi lemah, batang mungkin tidak "
                     "bisa terangkat dari batas mekanik. Disarankan F-max 15 %.")
+        elif v > 15.0:
+            txt += ("\n⚠ Di atas 15 % gaya dorong belum diukur (angka torsi "
+                    "diekstrapolasi). Gain 3/2/1 dituning pada F-max 15 %: respons "
+                    "bisa lebih agresif.")
         self.lb_authority.setText(txt)
 
     def _pid_warn_text(self):
@@ -944,7 +992,7 @@ class MainWindow(QtWidgets.QMainWindow):
             return
         ans = QtWidgets.QMessageBox.warning(
             self, "Ubah F-max?",
-            "F-max adalah batas atas throttle motor (8–15 %).\n\n"
+            "F-max adalah batas atas throttle motor saat PID (8–20 %).\n\n"
             "Menaikkannya membuat motor lebih kuat dan bisa mengubah hasil "
             "uji/tuning.\nPastikan area baling-baling aman.\n\n"
             "Buka kunci F-max? (terkunci lagi otomatis setelah 15 detik)",
@@ -954,14 +1002,14 @@ class MainWindow(QtWidgets.QMainWindow):
             return
         self.fmax_unlocked = True
         self.fmax.set_locked(False)
-        self.btn_fmax_lock.setText("\U0001f513  Kunci F-max")
+        self.btn_fmax_lock.setText("Kunci F-max")
         self.fmax_relock.start()
 
     def _lock_fmax(self):
         self.fmax_unlocked = False
         self.fmax_relock.stop()
         self.fmax.set_locked(True)
-        self.btn_fmax_lock.setText("\U0001f512  Buka kunci F-max…")
+        self.btn_fmax_lock.setText("Buka kunci F-max…")
 
     # --- tes motor ---
     def _motor_values(self):
@@ -1077,8 +1125,8 @@ class MainWindow(QtWidgets.QMainWindow):
             self.pid_run = True
             self._pid_t0 = time.monotonic()
             self.hw.other_lines.clear()       # hanya pesan sejak PID dinyalakan
-            self.btn_pid_run.setText("■  Hentikan PID")
-            self.btn_pid_run.setObjectName("Danger")
+            self.btn_pid_run.setText("■  HENTIKAN PID")
+            self.btn_pid_run.setObjectName("HeroStop")
         else:
             self.pid_run = False
             if self.hw.is_open:
@@ -1086,8 +1134,8 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.hw.stop_motors()
             self.chk_motor.setEnabled(True)
             self.btn_fmax_lock.setEnabled(True)
-            self.btn_pid_run.setText("▶  Aktifkan PID")
-            self.btn_pid_run.setObjectName("Primary")
+            self.btn_pid_run.setText("▶  AKTIFKAN PID")
+            self.btn_pid_run.setObjectName("Hero")
         self.btn_pid_run.style().unpolish(self.btn_pid_run)
         self.btn_pid_run.style().polish(self.btn_pid_run)
         self.sp.setEnabled(self.pid_run)
@@ -1269,6 +1317,7 @@ class MainWindow(QtWidgets.QMainWindow):
         if hw.error:
             state += f"\n\u26a0 {hw.error}"
         self.hw_status.setText(state)
+        self._refresh_chip()
 
         # status rekam
         if hw.recording:
@@ -1341,6 +1390,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.be = self.hw if hw else self.sim
         self.be.set_gains(self.kp.value(), self.ki.value(), self.kd.value())
         self.hw_box.setVisible(hw)
+        self.btn_pid_run.setVisible(hw)
+        self.hw_adv_card.setVisible(hw)
         # Mode hardware: PID, setpoint, noise, impuls & skenario tidak berlaku
         # (tahap 1: ESP32 hanya membaca IMU, motor belum dikendalikan).
         # Slider beban tetap aktif sebagai keterangan beban fisik.
@@ -1352,7 +1403,6 @@ class MainWindow(QtWidgets.QMainWindow):
             w.setVisible(not hw)
         # Gain PID mengikuti status gembok (dan terkunci paksa saat mode HW).
         self._apply_pid_lock()
-        self.btn_pid_lock.setEnabled(not hw)
         tip = ("Mode hardware (tahap 1): ESP32 hanya membaca IMU,\n"
                "motor belum dikendalikan dari GUI.") if hw else ""
         self.sp.setToolTip(tip)
@@ -1404,12 +1454,12 @@ class MainWindow(QtWidgets.QMainWindow):
         # supaya saat kembali ke simulasi status kunci tidak "bocor".
         hw = self.mode == "hw"
         run = getattr(self, "pid_run", False)
-        # Hardware: gembok PID simulasi tidak berlaku; gain terbuka hanya
-        # saat PID hardware aktif. Simulasi: ikuti gembok.
-        locked = False if hw else self.pid_locked
+        # Gembok berlaku di kedua mode: KUNCI = slider & spinbox gain
+        # nonaktif (cegah tergeser tak sengaja, mis. saat PID alat aktif).
+        locked = self.pid_locked
         for w in (self.kp, self.ki, self.kd):
             w.set_locked(locked)
-        self.btn_pid_lock.setText("\U0001f512" if self.pid_locked else "\U0001f513")
+        self.btn_pid_lock.setText("KUNCI" if self.pid_locked else "BUKA")
         self.btn_pid_lock.setToolTip(
             "Gain PID terkunci \u2014 klik untuk membuka."
             if self.pid_locked else
@@ -1463,7 +1513,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.band.setVisible(False)
         for line in self.event_markers:
             line.setVisible(False)
-        self.mt_event.setText("Waiting for setpoint / load change")
+        self.mt_event.setText("Menunggu perubahan setpoint / beban")
         for m in self.metric_w.values():
             m.set(DASH)
 
@@ -1570,6 +1620,7 @@ class MainWindow(QtWidgets.QMainWindow):
         a = np.asarray(self.hist)
         m = a[:, COL_T] > t - self.WINDOW_S
         x = a[m, COL_T]
+        self._update_readout(s)
         self.c_th.setData(x, a[m, COL_TH])
         self.c_meas.setData(x, a[m, COL_MEAS])
         self.c_sp.setData(x, a[m, COL_SP])
@@ -1641,7 +1692,7 @@ class MainWindow(QtWidgets.QMainWindow):
             QtCore.QTimer.singleShot(1000, self._poll_open3d)
         else:
             self.btn_open3d.setEnabled(True)
-            self.btn_open3d.setText("\U0001f5a5  Buka 3D")
+            self.btn_open3d.setText("Buka viewer 3D")
             QtWidgets.QMessageBox.warning(self, "Tidak bisa membuka 3D", msg)
 
     def _poll_open3d(self):
@@ -1654,7 +1705,7 @@ class MainWindow(QtWidgets.QMainWindow):
             QtCore.QTimer.singleShot(1000, self._poll_open3d)
         else:
             self.btn_open3d.setEnabled(True)
-            self.btn_open3d.setText("\U0001f5a5  Buka 3D")
+            self.btn_open3d.setText("Buka viewer 3D")
             self.btn_open3d.setToolTip(
                 "Viewer 3D belum merespons. Klik lagi untuk mencoba ulang.")
 
@@ -1671,7 +1722,7 @@ class MainWindow(QtWidgets.QMainWindow):
         if state != "connected" and not self.btn_open3d.isEnabled() \
                 and self.btn_open3d.text().startswith("\u2713"):
             self.btn_open3d.setEnabled(True)
-            self.btn_open3d.setText("\U0001f5a5  Buka 3D")
+            self.btn_open3d.setText("Buka viewer 3D")
 
     # ------------------------------------------------------------------
     # METRIK

@@ -52,14 +52,14 @@ class BeamView(QtWidgets.QWidget):
 
         outer = QtCore.QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5)
         clip = QtGui.QPainterPath()
-        clip.addRoundedRect(outer, 10, 10)
+        clip.addRect(outer)
         p.setClipPath(clip)
 
-        p.fillRect(0, 0, W, Hd, QtGui.QColor("#F3F5F9"))
+        p.fillRect(0, 0, W, Hd, QtGui.QColor("#FFFFFF"))
 
-        # Grid halus
+        # Grid halus (kertas milimeter)
         grid_sz = 35
-        p.setPen(QtGui.QPen(QtGui.QColor("#DDE3EC"), 1))
+        p.setPen(QtGui.QPen(QtGui.QColor("#EEEFEB"), 1))
         for x in range(0, W, grid_sz):
             p.drawLine(x, 0, x, Hd)
         for y in range(0, Hd, grid_sz):
@@ -72,14 +72,14 @@ class BeamView(QtWidgets.QWidget):
         L = self.L
 
         ground_y = cy + 0.165 * S
-        p.setPen(QtGui.QPen(QtGui.QColor("#3E7B2E"), 1.2))
+        p.setPen(QtGui.QPen(QtGui.QColor(BORDER), 1.2))
         p.drawLine(QtCore.QPointF(0, ground_y), QtCore.QPointF(W, ground_y))
 
-        # 1. BASE BIRU
+        # 1. BASE
         base_w = 0.54 * S
         base_h = 0.016 * S
         p.setPen(Qt.NoPen)
-        p.setBrush(QtGui.QColor(ACCENT))
+        p.setBrush(QtGui.QColor("#5B6068"))
         p.drawRect(QtCore.QRectF(cx - base_w / 2, ground_y - base_h, base_w, base_h))
 
         # 2. TIANG HITAM
@@ -183,7 +183,7 @@ class BeamView(QtWidgets.QWidget):
         p.setClipping(False)
         p.setBrush(Qt.NoBrush)
         p.setPen(QtGui.QPen(QtGui.QColor(BORDER), 1))
-        p.drawRoundedRect(outer, 10, 10)
+        p.drawRect(outer)
 
     def _draw_angle_scale(self, p, cx, cy, S):
         """Busur derajat di sisi kanan poros: tick tiap 5 deg, label tiap 15 deg,
@@ -228,16 +228,18 @@ class BeamView(QtWidgets.QWidget):
 
     def _draw_footer(self, p, W, H, top):
         p.setPen(Qt.NoPen)
-        p.setBrush(QtGui.QColor("#F7F8FA"))
+        p.setBrush(QtGui.QColor("#F4F4F1"))
         p.drawRect(QtCore.QRectF(0, top, W, H - top))
         p.setPen(QtGui.QPen(QtGui.QColor(BORDER), 1))
         p.drawLine(QtCore.QPointF(0, top), QtCore.QPointF(W, top))
 
+        # Angka utama (sudut, setpoint, gaya) sudah ada di strip atas;
+        # footer ini hanya keterangan sekunder.
         cols = [
-            ("ANGLE \u03b8", f"{self.th:+.2f}\u00b0", ACCENT),
+            ("SUDUT \u03b8", f"{self.th:+.2f}\u00b0", "#16191D"),
             ("SETPOINT", f"{self.sp:+.2f}\u00b0", ACCENT),
-            ("THRUST L / R", f"{self.F1:.1f} / {self.F2:.1f} N", GREEN),
-            ("LOAD", f"{self.m * 1000:.0f} g @ {self.x * 100:.0f} cm" if self.m > 0 else "NO LOAD",
+            ("GAYA KIRI / KANAN", f"{self.F1:.2f} / {self.F2:.2f} N", "#16191D"),
+            ("BEBAN", f"{self.m * 1000:.0f} g @ {self.x * 100:.0f} cm" if self.m > 0 else "tanpa beban",
              RED if self.m > 0 else MUTED),
         ]
         cw = W / len(cols)

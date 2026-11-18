@@ -1,17 +1,27 @@
-"""Palet warna aplikasi."""
+"""Palet warna aplikasi.
 
-BG = "#F0F2F5"
-SURFACE = "#F7F8FA"
-CARD = "#FCFCFD"
-CARD_ALT = "#F5F7FA"
-PLOT_BG = "#F8FAFC"
-BORDER = "#DCE2EA"
-TEXT = "#222A35"
-MUTED = "#6E7A89"
-ACCENT = "#2F6FED"
-ACCENT_DARK = "#1D4ED8"
-AMBER = "#D9A400"
-AMBER_SOFT = "#FFF4D6"
-GREEN = "#1F9D55"
-RED = "#D9463E"
-PURPLE = "#7C5CD6"
+Arah desain: panel instrumen laboratorium (Swiss / fungsional).
+- Latar kertas abu hangat, panel putih, garis tipis, sudut tegas.
+- SATU warna aksen (oranye keselamatan) untuk setpoint & aksi utama.
+- Warna lain hanya bermakna status: hijau = aktif/aman, kuning = peringatan,
+  merah = bahaya/stop. Biru hanya untuk suku D di grafik.
+"""
+
+BG = "#E9EAE6"          # latar jendela (kertas abu hangat)
+SURFACE = "#F4F4F1"     # header & strip
+CARD = "#FFFFFF"        # panel
+CARD_ALT = "#F4F4F1"    # baris selang-seling / tile
+PLOT_BG = "#FFFFFF"
+BORDER = "#CDCFC9"      # garis tipis
+RULE = "#16191D"        # garis tegas (judul seksi)
+TEXT = "#16191D"        # tinta
+INK = "#16191D"
+MUTED = "#6A6F75"
+ACCENT = "#D9480F"      # oranye keselamatan: setpoint & aksi utama
+ACCENT_DARK = "#A6380B"
+AMBER = "#B7791F"
+AMBER_SOFT = "#FFF3D6"
+GREEN = "#2B8A3E"
+RED = "#C92A2A"
+PURPLE = "#1C7ED6"      # (nama lama dipertahankan) biru: suku D / laju sudut
+MONO = "Consolas"

@@ -220,8 +220,8 @@ class HardwareBackend:
         return self.send_command(f"M,{l:.1f},{r:.1f}\n")
 
     def set_fmax(self, pct):
-        """Kirim batas atas throttle (F-max, 8..15 %) ke firmware."""
-        p = max(8.0, min(15.0, float(pct)))
+        """Kirim batas atas throttle PID (F-max, 8..20 %) ke firmware."""
+        p = max(8.0, min(20.0, float(pct)))
         return self.send_command(f"F,{p:.1f}\n")
 
     def send_pid(self, on):

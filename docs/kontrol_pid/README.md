@@ -34,7 +34,7 @@ kiri  = bias − u/100·R,   kanan = bias + u/100·R   (dibatasi 40 %/s per moto
 | Failsafe heartbeat GUI | > 0,5 s tanpa perintah → motor 0 |
 | Batas mati sudut | 29–33° (slider), bisa dimatikan |
 | Data IMU putus | > 50 ms → motor 0 |
-| F-max | 8–15 %, terkunci + konfirmasi |
+| F-max (batas PID) | 8–20 % (default 15), terkunci + konfirmasi. Tes motor manual tidak dibatasi F-max (0–100 %) |
 
 ## Gain saat ini
 
