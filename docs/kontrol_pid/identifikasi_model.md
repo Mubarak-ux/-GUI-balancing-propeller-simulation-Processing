@@ -2,7 +2,7 @@
 
 **Metode:** simulasi loop tertutup (PID firmware yang sama, setpoint & trim dari
 CSV) dicocokkan ke sudut terukur dengan Nelder-Mead.
-**Data:** `hw_20261118_175628_-10.csv` (Kp 1,5 / Ki 0,6 / Kd 1,0) dan
+**Data** (`data/2026-11-18_uji_pid/`): `hw_20261118_175628_-10.csv` (Kp 1,5 / Ki 0,6 / Kd 1,0) dan
 `hw_20261118_180513_-_10kedua.csv` (Kp 2,5 / Ki 2,0 / Kd 1,0).
 
 ## Model
@@ -32,7 +32,7 @@ Validasi: dengan gain 1,5/0,6/1,0 model memberi overshoot ~60 % dan settling
 - **k negatif → batang tidak stabil alami** (seperti pendulum terbalik): makin
   miring, makin kuat jatuh ke sisi itu. Cocok dengan batang yang selalu diam di
   batas mekanik (±31–33°) saat motor mati.
-- Uji ayunan 11-11 (`docs/pengukuran_b.md`) memberi k = +0,039 (stabil). Kemungkinan
+- Uji ayunan 11-11 (`docs/pengukuran/pengukuran_b.md`) memberi k = +0,039 (stabil). Kemungkinan
   susunan rig berubah sejak itu (ESP32/kabel di atas poros menaikkan pusat massa).
   Perlu dicek ulang.
 - Parameter berbeda antar data (k −0,05..−0,08, g_F 0,7..1,1) → tuning dibuat

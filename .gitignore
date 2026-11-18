@@ -17,7 +17,7 @@ env/
 .idea/
 
 # Hasil rekaman hardware (data percobaan lokal)
-data/*.csv
+data/**/*.csv
 
 # Build / cache Processing
 build/

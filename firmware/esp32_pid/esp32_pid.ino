@@ -130,7 +130,8 @@ float trimU = 0;                    // feedforward/trim (%, bingkai firmware) da
 #define SPINUP_RAMP_MS  1000        // 0 -> Fmin
 #define SPINUP_HOLD_MS  700         // tahan di Fmin agar kedua motor stabil berputar
 #define SLEW_PCT_PER_S  40.0f       // batas laju perubahan throttle tiap motor
-#define I_ZONE_DEG      6.0f        // integral hanya jika |error| < ini (10: overshoot besar; 3: error tunak tertahan)
+#define I_ZONE_DEG      6.0f        // di dalam zona integral penuh, di luar diperlambat
+#define I_OUT_FACTOR    0.5f        // laju integral di luar zona (0 = mati -> error tunak tertahan)
 uint32_t pidStartMs = 0;
 float cmdL = 0, cmdR = 0;           // throttle setelah pembatas laju
 
@@ -322,8 +323,11 @@ void runPid(float dt) {
   dTerm = -kd * beamRate;                      // turunan pada pengukuran (gyro)
   float uRaw = trimU + pTerm + iTerm + dTerm;
   float u = constrain(uRaw, -100.0f, 100.0f);
-  // anti-windup: (1) clamping saat jenuh, (2) integral hanya dekat setpoint
-  if (fabsf(e) < I_ZONE_DEG && (u == uRaw || uRaw * e < 0)) iTerm += ki * e * dt;
+  // anti-windup: (1) clamping saat jenuh, (2) di luar I-zone integral DIPERLAMBAT
+  // (bukan dimatikan). Data 18-11 (-10 ketiga): integral mati di luar zona ->
+  // batang tertahan di -22 deg (error 12 deg) karena P saja kalah oleh torsi jatuh.
+  float iRate = (fabsf(e) < I_ZONE_DEG) ? 1.0f : I_OUT_FACTOR;
+  if (u == uRaw || uRaw * e < 0) iTerm += iRate * ki * e * dt;
   iTerm = constrain(iTerm, -100.0f, 100.0f);
   uOut = u;
   // Bias di TENGAH rentang kerja [Fmin, Fmax] -> ruang naik = ruang turun,

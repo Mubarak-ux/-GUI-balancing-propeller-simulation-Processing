@@ -90,10 +90,16 @@ pip install -r requirements.txt
 VERSI 2/
 ├── app/                     # Kode Python (GUI & backend)
 ├── BalancingPropellerIMU/   # Sketch Processing 3D viewer (.pde)
-├── docs/                    # Dokumentasi & catatan (lihat docs/README.md)
-│   └── assets/              # Gambar pendukung (tampak atas/depan/…)
-├── firmware/                # Firmware ESP32 (esp32_pid: IMU + motor + PID; esp32_imu_test: tes IMU; esp32_motor_only: tes/kalibrasi ESC)
-├── data/                    # Hasil rekaman CSV (tidak di-commit)
+├── firmware/
+│   ├── esp32_pid/           # UTAMA: IMU + motor + F-max + PID
+│   ├── esp32_imu_test/      # diagnosa IMU
+│   ├── esp32_motor_only/    # diagnosa motor + kalibrasi ESC
+│   └── backup_uno/          # backup firmware Uno lama
+├── docs/                    # Dokumentasi (lihat docs/README.md)
+│   ├── pengukuran/          # J, redaman b, gaya dorong F
+│   ├── kontrol_pid/         # PID hardware: model, log uji
+│   └── assets/              # Foto tampak alat
+├── data/                    # Rekaman CSV per sesi (tidak di-commit)
 ├── run_app.py / run_app.bat # Launcher
 ├── requirements.txt
 ├── LICENSE
@@ -118,7 +124,7 @@ Sketch `.pde` dimodularisasi menjadi beberapa tab di aplikasi Processing:
 * **`HudIMU.pde`**: Tampilan 2D overlay Heads-Up Display (informasi telemetri, status koneksi, dan notifikasi).
 
 ### Dokumentasi (`docs/`)
-* **[`docs/README.md`](docs/README.md)**: Indeks seluruh dokumen & aset.
-* **[`docs/ringkasan_pengukuran.md`](docs/ringkasan_pengukuran.md)**: Data terukur alat (massa, dimensi, J) & parameter simulasi.
-* **[`docs/pengukuran_b.md`](docs/pengukuran_b.md)**: Identifikasi redaman `b` (uji ayunan, `b = 2·J·α`).
+* **[`docs/README.md`](docs/README.md)**: Indeks seluruh dokumen, data & parameter kunci.
+* **[`docs/pengukuran/`](docs/pengukuran/)**: Pengukuran fisik alat — [ringkasan](docs/pengukuran/ringkasan_pengukuran.md), [redaman b](docs/pengukuran/pengukuran_b.md), [gaya dorong F](docs/pengukuran/pengukuran_F.md).
+* **[`docs/kontrol_pid/`](docs/kontrol_pid/)**: PID di alat asli — [struktur & gain](docs/kontrol_pid/README.md), [identifikasi model](docs/kontrol_pid/identifikasi_model.md), [log uji](docs/kontrol_pid/log_uji_pid.md).
 * **[`docs/versi2.md`](docs/versi2.md)**: Komparasi VERSI 1 vs VERSI 2.

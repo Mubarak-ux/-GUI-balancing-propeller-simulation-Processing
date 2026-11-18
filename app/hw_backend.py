@@ -239,7 +239,7 @@ class HardwareBackend:
 
     @staticmethod
     def thrust_n(pct):
-        """Throttle (%) -> gaya dorong (N), fit linear 8..15 % (docs/pengukuran_F.md)."""
+        """Throttle (%) -> gaya dorong (N), fit linear 8..15 % (docs/pengukuran/pengukuran_F.md)."""
         return max(0.0, 0.1241 * pct - 0.316) if pct >= 8.0 else 0.0
 
     def stop_motors(self):

@@ -1,7 +1,7 @@
 # Kontrol PID Hardware (Week 3)
 
 Dokumentasi PID di alat asli (firmware `firmware/esp32_pid`). Dipisah dari
-`docs/ringkasan_pengukuran.md` supaya ringkasan pengukuran tetap pendek.
+`docs/pengukuran/ringkasan_pengukuran.md` supaya ringkasan pengukuran tetap pendek.
 
 | File | Isi |
 |---|---|
@@ -15,7 +15,9 @@ Dokumentasi PID di alat asli (firmware `firmware/esp32_pid`). Dipisah dari
 ```
 e  = setpoint − sudut
 u  = trim + Kp·e + I − Kd·(laju gyro)          (u dalam %, −100..100)
-I += Ki·e·dt   hanya jika |e| < 6° dan keluaran tidak jenuh
+I += Ki·e·dt        jika |e| < 6°   (I-zone)
+I += 0,5·Ki·e·dt    jika |e| ≥ 6°   (diperlambat, tidak dimatikan)
+                    dan hanya jika keluaran tidak jenuh
 bias = (8 + Fmax)/2,   R = (Fmax − 8)/2         (Fmax 15 → 11,5 ± 3,5 %)
 kiri  = bias − u/100·R,   kanan = bias + u/100·R   (dibatasi 40 %/s per motor)
 ```
@@ -38,6 +40,6 @@ kiri  = bias − u/100·R,   kanan = bias + u/100·R   (dibatasi 40 %/s per moto
 
 | Kp (%/°) | Ki (%/(°·s)) | Kd (%/(°/s)) | I-zone |
 |---|---|---|---|
-| **2,0** | **1,5** | **1,0** | **6°** |
+| **3,0** | **2,0** | **1,0** | **6°** (luar zona 50 %) |
 
 Cara pakai trim: setelah batang tenang di 0°, tekan **Trim ← nilai I sekarang**.

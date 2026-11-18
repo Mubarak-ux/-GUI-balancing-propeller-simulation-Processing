@@ -133,11 +133,9 @@ VERSI 2/
 │   └── NetworkIMU.pde                # Socket UDP, JSON parser, ACK reply, & pemicu impuls
 ├── docs/                             # Dokumentasi & Tangkapan Layar
 │   ├── README.md                     # Indeks dokumentasi
-│   ├── ringkasan_pengukuran.md       # Data terukur alat & parameter simulasi
-│   ├── pengukuran_b.md               # Identifikasi redaman b (uji ayunan)
+│   ├── pengukuran/                   # Data terukur alat: ringkasan, redaman b, gaya dorong F
+│   ├── kontrol_pid/                  # PID hardware: model, log uji
 │   ├── versi2.md                     # Laporan komparasi & upgrade VERSI 1 vs VERSI 2
-│   ├── dokumentasiPY.png             # Tangkapan layar GUI Python
-│   ├── dokumentasiPDE.png            # Tangkapan layar visualizer Processing 3D
 │   └── assets/                       # Gambar tampak alat (atas/depan/samping/bawah)
 ├── firmware/                         # Firmware ESP32 (esp32_pid: IMU + motor + PID; esp32_imu_test: tes IMU; esp32_motor_only: tes/kalibrasi ESC)
 ├── data/                             # Hasil rekaman CSV (tidak di-commit)

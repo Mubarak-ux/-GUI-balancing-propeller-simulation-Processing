@@ -100,10 +100,10 @@ class MainWindow(QtWidgets.QMainWindow):
     # (J, b, k, F(throttle), bias tengah rentang, ESC 50 Hz). Data PID nyata
     # 18-11-2026 (Kp 3/Ki 1.5/Kd 1) berosilasi +/-3.6 deg, periode 1.1 s ->
     # cocok dengan lag motor+baling ~0.3-0.5 s + delay ~80 ms (bukan 0.1 s).
-    # Hasil identifikasi & tuning robust (lihat docs/kontrol_pid/): plant
-    # tidak stabil alami (k ~ -0.05..-0.08 N.m/rad). Kp 2.5 menambah osilasi,
-    # Kp 2.0 + Ki 1.5 + I-zone 6 deg memberi std terkecil & error tunak ~0.2 deg.
-    HW_GAINS = (2.0, 1.5, 1.0)
+    # Gain default hardware: dipilih dari uji di alat (18-11-2026) dengan
+    # firmware esp32_pid (loop 500 Hz, soft-start, I-zone 6 deg + integral 50 %
+    # di luar zona). Lihat docs/kontrol_pid/.
+    HW_GAINS = (3.0, 2.0, 1.0)
 
     TICK_MS = 20            # 50 Hz refresh UI
     WINDOW_S = 8.0          # rentang grafik (detik)
@@ -549,7 +549,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.btn_pid_lock.setFixedWidth(34)
         self.btn_pid_lock.clicked.connect(self.toggle_pid_lock)
         controller.head.addWidget(self.btn_pid_lock)
-        # Rentang slider disesuaikan dengan model terukur (docs/ringkasan_pengukuran.md):
+        # Rentang slider disesuaikan dengan model terukur (docs/pengukuran/ringkasan_pengukuran.md):
         # di atas kira-kira Kp > 0.2 + 11.4*Kd sistem tidak stabil.
         self.kp = Param("Kp", 0, 5, self.be.kp, 0.05, "%/\u00b0")
         self.ki = Param("Ki", 0, 3, self.be.ki, 0.05, "%/(\u00b0\u00b7s)")
@@ -920,7 +920,7 @@ class MainWindow(QtWidgets.QMainWindow):
     def _pid_authority(fmax):
         """Bias, rentang koreksi (%) dan torsi maksimum (N.m) PID hardware.
         Sama dengan firmware: bias = (8 + Fmax)/2, R = (Fmax - 8)/2;
-        F(u) = 0.1241*u - 0.316 N (docs/pengukuran_F.md), L = 0.25 m."""
+        F(u) = 0.1241*u - 0.316 N (docs/pengukuran/pengukuran_F.md), L = 0.25 m."""
         bias = 0.5 * (8.0 + fmax)
         R = 0.5 * (fmax - 8.0)
         tau = 0.25 * 2 * 0.1241 * R

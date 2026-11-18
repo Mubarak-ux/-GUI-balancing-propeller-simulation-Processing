@@ -2,7 +2,7 @@
 
 **Metode:** uji ayunan bebas (motor mati, tanpa beban), fit
 `θ(t) = off + A·e^(−αt)·cos(ω_d·t + φ)`.
-**Data:** `hw_20261111_211524` (14,15 s, ~136 Hz, dua gangguan).
+**Data:** `data/2026-11-09_11_uji_awal/hw_20261111_211524` (14,15 s, ~136 Hz, dua gangguan).
 
 ---
 

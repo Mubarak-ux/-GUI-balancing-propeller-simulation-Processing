@@ -1,37 +1,44 @@
 VERSI 2/
-├── app/                             # Backend simulasi, kontrol PID, dan GUI Python
-│   ├── assets/                      # Aset gambar & grafis antarmuka
-│   │   ├── logo_trik_ugm.jpg        # Banner logo resmi TRIK & UGM
-│   │   └── strukturPY.txt           # File struktur pohon direktori proyek ini
-│   ├── widgets/                     # Komponen UI kustom dan visualisasi balok 2D
-│   │   ├── beam_view.py             # Widget visualisasi 2D interaktif (sentak impuls)
-│   │   ├── controls.py              # Komponen kartu metrik, slider parameter, & input
+├── app/                             # Backend simulasi, kontrol, dan GUI Python
+│   ├── assets/
+│   │   └── logo_trik_ugm.jpg        # Banner logo TRIK & UGM
+│   ├── widgets/                     # Komponen UI kustom
+│   │   ├── beam_view.py             # Visualisasi 2D batang (klik = impuls)
+│   │   ├── controls.py              # Slider parameter, kartu, metrik
 │   │   └── __init__.py
-│   ├── config.py                    # Konfigurasi palet warna dan parameter UI
-│   ├── hw_backend.py                # Backend pembacaan serial USB hardware ESP32 + IMU
-│   ├── hw_stream.py                 # Telemetri streaming data hardware via UDP
-│   ├── main.py                      # Titik masuk utama aplikasi PySide6
-│   ├── main_window.py               # Jendela utama dengan plot real-time & kontrol PID
-│   ├── metrics.py                   # Algoritma perhitungan metrik respon transien
-│   ├── processing_stream.py         # Pengirim telemetri UDP ke viewer Processing 3D
-│   ├── sim_backend.py               # Model matematika dinamika fisika seesaw & motor
-│   ├── theme.py                     # Stylesheet QSS tema antarmuka modern
-│   └── __init__.pyc
-├── BalancingPropellerIMU/            # Sketch visualizer 3D Processing (P3D HiDPI)
-│   ├── BalancingPropellerIMU.pde    # Setup utama, draw loop, dan state telemetri
-│   ├── CameraIMU.pde                # Navigasi kamera orbit 3D, pencahayaan, mouse & keyboard
-│   ├── HudIMU.pde                   # Heads-Up Display 2D tajam (panel status & grafik sudut)
-│   ├── ModelIMU.pde                 # Geometri 3D rakitan alat, baling-baling, IMU GY-521, ESC
-│   └── NetworkIMU.pde               # Komunikasi socket UDP port 9999 & validasi ACK
-├── data/                            # Folder penyimpanan log rekaman data CSV
-├── docs/                            # Dokumentasi teknis & laporan proyek
-│   ├── assets/                      # Foto referensi tampak atas, depan, samping, bawah
-│   ├── pengukuran_b.md              # Laporan identifikasi koefisien redaman b
-│   ├── ringkasan_pengukuran.md      # Data terukur parameter fisik alat nyata
-│   ├── versi2.md                    # Laporan upgrade dan komparasi VERSI 1 vs VERSI 2
-│   └── README.md                    # Indeks panduan dokumentasi
-├── firmware/                        # Firmware ESP32 (esp32_pid: IMU + motor + PID; esp32_imu_test: tes IMU; esp32_motor_only: tes/kalibrasi ESC)
-├── requirements.txt                 # Daftar dependensi library Python
-├── README.md                        # Dokumentasi utama proyek & panduan pengoperasian
-├── run_app.bat                      # Launcher 1-klik Windows (Processing 3D + GUI Python)
-└── run_app.py                       # Skrip launcher utama Python (Simulasi & Hardware)
+│   ├── config.py                    # Palet warna & parameter UI
+│   ├── hw_backend.py                # Serial ESP32: data IMU, tes motor, F-max, PID hardware
+│   ├── hw_stream.py                 # Telemetri hardware via UDP
+│   ├── main.py                      # Titik masuk aplikasi PySide6
+│   ├── main_window.py               # Jendela utama, grafik, panel kontrol
+│   ├── metrics.py                   # Metrik respon transien
+│   ├── processing_launcher.py       # Peluncur viewer Processing
+│   ├── processing_stream.py         # Telemetri UDP ke viewer Processing 3D
+│   ├── sim_backend.py               # Model fisika seesaw + PID simulasi
+│   ├── theme.py                     # Stylesheet QSS
+│   └── __init__.py
+├── BalancingPropellerIMU/           # Viewer 3D Processing (P3D)
+│   ├── BalancingPropellerIMU.pde    # Setup, draw loop, state telemetri
+│   ├── CameraIMU.pde                # Kamera orbit, cahaya, input
+│   ├── HudIMU.pde                   # HUD 2D
+│   ├── ModelIMU.pde                 # Geometri 3D alat
+│   └── NetworkIMU.pde               # UDP port 9999 & ACK
+├── data/                            # Rekaman CSV (tidak di-commit)
+│   ├── 2026-11-09_11_uji_awal/      # Uji IMU & uji ayunan
+│   └── 2026-11-18_uji_pid/          # Uji PID hardware
+├── docs/                            # Dokumentasi (lihat docs/README.md)
+│   ├── assets/                      # Foto tampak alat
+│   ├── pengukuran/                  # ringkasan, redaman b, gaya dorong F, hitungan J
+│   ├── kontrol_pid/                 # struktur PID, identifikasi model, log uji
+│   ├── README.md                    # Indeks dokumentasi
+│   ├── strukturPY.txt               # File ini
+│   └── versi2.md                    # Komparasi VERSI 1 vs VERSI 2
+├── firmware/                        # Firmware mikrokontroler
+│   ├── esp32_pid/                   # UTAMA: IMU + motor manual + F-max + PID
+│   ├── esp32_imu_test/              # Diagnosa: baca IMU saja
+│   ├── esp32_motor_only/            # Diagnosa: motor tanpa IMU + kalibrasi ESC (H/L)
+│   └── backup_uno/                  # Backup firmware Arduino Uno lama (.hex)
+├── requirements.txt                 # Dependensi Python
+├── README.md                        # Dokumentasi utama & panduan
+├── run_app.bat                      # Launcher 1-klik Windows
+└── run_app.py                       # Launcher Python (Simulasi & Hardware)
