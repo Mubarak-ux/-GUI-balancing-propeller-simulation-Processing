@@ -68,7 +68,9 @@ class BeamView(QtWidgets.QWidget):
         # skala piksel/meter; ruang ekstra agar busur derajat & label tidak terpotong
         S = min(W / 0.82, Hd / 0.62)
         cx = W / 2.0
-        cy = Hd * 0.44
+        # titik poros di tengah vertikal area gambar: isi (busur / baling-baling
+        # ~0,17·S di atas poros, lantai 0,165·S di bawah) jadi simetris
+        cy = Hd * 0.5
         L = self.L
 
         ground_y = cy + 0.165 * S

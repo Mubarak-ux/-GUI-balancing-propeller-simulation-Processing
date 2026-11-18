@@ -13,8 +13,8 @@ from PySide6 import QtCore, QtGui, QtWidgets
 from .hw_stream import TelemetryStream
 from .config import (ACCENT, AMBER, BORDER, GREEN, INK, MUTED, PLOT_BG,
                      PURPLE, RED)
-from .metrics import (COL_D, COL_I, COL_MEAS, COL_P, COL_SP, COL_T, COL_TH,
-                      COL_U, COL_W, DASH, METRIC_KEYS, compute_metrics)
+from .metrics import (COL_D, COL_F1, COL_F2, COL_I, COL_MEAS, COL_P, COL_SP,
+                      COL_T, COL_TH, COL_U, COL_W, DASH, METRIC_KEYS, compute_metrics)
 from .hw_backend import (DATA_DIR, HAVE_SERIAL, HardwareBackend, list_ports,
                          looks_like_esp)
 from .processing_launcher import start_processing
@@ -135,6 +135,7 @@ class MainWindow(QtWidgets.QMainWindow):
         # tidak rusak saat data lama terbuang.
         plot_len = int(self.WINDOW_S * 1000 / self.TICK_MS * 1.25)
         self.hist = collections.deque(maxlen=plot_len)
+        self.thr_hist = collections.deque(maxlen=plot_len)   # (throttle kiri, kanan) %
         self.ev_buf = []
         self.ev_max = int(self.EVENT_MAX_S * 1000 / self.TICK_MS)
 
@@ -418,10 +419,26 @@ class MainWindow(QtWidgets.QMainWindow):
         self.p5.setXLink(self.p1)
         self.c_omega = self._curve(self.p5, pen=pg.mkPen(PURPLE, width=1.8))
 
-        for pl in (self.p1, self.p2, self.p3, self.p4, self.p5):
+        # ---------- Tab: Throttle tiap motor ----------
+        self.p7 = pg.PlotWidget(background=PLOT_BG)
+        self.p7.setLabel("left", "Throttle", "%")
+        self.p7.setLabel("bottom", "Waktu", "s")
+        self.p7.setXLink(self.p1)
+        self._make_legend(self.p7)
+        self.c_thr1 = self._curve(self.p7, pen=pg.mkPen(INK, width=1.8), name="Kiri (CCW)")
+        self.c_thr2 = self._curve(self.p7, pen=pg.mkPen(PURPLE, width=1.8, style=Qt.DashLine),
+                                  name="Kanan (CW)")
+        # garis batas kerja PID: F-min 8 % dan F-max (hanya bermakna di hardware)
+        self.ln_fmin = self.p7.addLine(y=8.0, pen=pg.mkPen(MUTED, width=1, style=Qt.DotLine))
+        self.ln_fmax = self.p7.addLine(y=15.0, pen=pg.mkPen(RED, width=1, style=Qt.DotLine))
+        self.ln_fmin.setVisible(False)      # mode awal simulasi: tanpa garis batas
+        self.ln_fmax.setVisible(False)
+        self.p7.setLabel("left", "F / Fmax", "%")
+
+        plots = (self.p1, self.p2, self.p3, self.p4, self.p5, self.p7)
+        for pl in plots:
             self._style_plot(pl)
-        self.event_markers = [self._make_event_marker(pl)
-                              for pl in (self.p1, self.p2, self.p3, self.p4, self.p5)]
+        self.event_markers = [self._make_event_marker(pl) for pl in plots]
 
         def stack(*widgets):
             w = QtWidgets.QWidget()
@@ -438,14 +455,28 @@ class MainWindow(QtWidgets.QMainWindow):
         tabs.addTab(stack(self.p3), "Suku PID")
         tabs.addTab(stack(self.p4, self.p5), "Error && \u03c9")
         tabs.addTab(self._build_tuning_log_tab(), "Log tuning")
-        tabs.addTab(self._build_scenario_tab(), "Skenario otomatis")
+        self._scn_tab_idx = tabs.addTab(self._build_scenario_tab(), "Skenario otomatis")
         self.tabs = tabs
 
         telemetry = Card("Telemetri", "jendela 10 s terakhir")
         telemetry.body.addWidget(tabs, 1)
 
+        # Baris atas: animasi 2D (kiri) + grafik throttle tiap motor (kanan),
+        # supaya throttle selalu terlihat tanpa pindah tab.
+        thr_card = Card("Throttle motor", "kiri / kanan, %")
+        thr_card.body.addWidget(self.p7, 1)
+        thr_card.setMinimumWidth(260)
+        top = QtWidgets.QSplitter(Qt.Horizontal)
+        top.addWidget(self.view)
+        top.addWidget(thr_card)
+        top.setStretchFactor(0, 6)
+        top.setStretchFactor(1, 4)
+        top.setSizes([600, 400])
+        top.setChildrenCollapsible(False)
+        self.top_split = top
+
         left = QtWidgets.QSplitter(Qt.Vertical)
-        left.addWidget(self.view)
+        left.addWidget(top)
         left.addWidget(telemetry)
         left.setSizes([380, 440])
         left.setStretchFactor(0, 4)
@@ -642,7 +673,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.cb_mode = QtWidgets.QComboBox()
         self.cb_mode.addItem("Simulasi", "sim")
-        self.cb_mode.addItem("Hardware (ESP32 + IMU)", "hw")
+        self.cb_mode.addItem("Hardware", "hw")
         self.cb_mode.currentIndexChanged.connect(
             lambda _: self.set_mode(self.cb_mode.currentData()))
         card.body.addWidget(self.cb_mode)
@@ -727,6 +758,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.btn_cut_off.setToolTip("Matikan/hidupkan batas mati sudut. Saat dimatikan,\n"
                                     "PID tidak berhenti walau batang menyentuh batas mekanik.")
         self.btn_cut_off.clicked.connect(self._toggle_cutoff)
+        self._style_cutoff_btn(True)
         sec_pid.add(self.btn_cut_off, 3)
         adv.addWidget(sec_pid)
 
@@ -938,6 +970,8 @@ class MainWindow(QtWidgets.QMainWindow):
         v = max(8.0, min(20.0, float(v)))
         # Slider tes motor manual selalu 0..100 % (tidak ikut F-max).
         self._on_motor_slider()
+        if hasattr(self, "ln_fmax"):
+            self.ln_fmax.setValue(v)
         if self.hw.is_open:
             self.hw.set_fmax(v)
         bias, R, tau = self._pid_authority(v)
@@ -1090,10 +1124,19 @@ class MainWindow(QtWidgets.QMainWindow):
         else:
             self.hw.cutoff_on = True
         on = self.hw.cutoff_on
-        self.btn_cut_off.setText("Batas mati: AKTIF" if on else "Batas mati: MATI ⚠")
+        self._style_cutoff_btn(on)
         self.cut.setEnabled(on)
         if self.pid_run:
             self.hw.send_pid(True)
+
+    def _style_cutoff_btn(self, on):
+        """Dua kondisi warna (palet yang sudah ada): AKTIF = hijau penuh
+        (pengaman bekerja), MATI = kuning penuh (peringatan)."""
+        color, hover = (GREEN, "#237032") if on else (AMBER, "#946218")
+        self.btn_cut_off.setText("Batas mati: AKTIF" if on else "Batas mati: MATI ⚠")
+        self.btn_cut_off.setStyleSheet(
+            f"QPushButton {{ background:{color}; border:1px solid {color}; color:#FFFFFF; }}"
+            f"QPushButton:hover {{ background:{hover}; border-color:{hover}; }}")
 
     # --- kontrol PID hardware ---
     def _toggle_pid_run(self):
@@ -1239,6 +1282,7 @@ class MainWindow(QtWidgets.QMainWindow):
     def _on_mapping(self, *_):
         self.hw.set_invert(self.chk_inv.isChecked())
         self.hist.clear()
+        self.thr_hist.clear()
         self._clear_event()
 
     def _calibrate_gyro(self):
@@ -1258,11 +1302,13 @@ class MainWindow(QtWidgets.QMainWindow):
     def _tare(self):
         self.hw.tare()
         self.hist.clear()
+        self.thr_hist.clear()
         self._clear_event()
 
     def _untare(self):
         self.hw.offset = 0.0
         self.hist.clear()
+        self.thr_hist.clear()
         self._clear_event()
 
     def _on_hw_load(self, *_):
@@ -1391,6 +1437,16 @@ class MainWindow(QtWidgets.QMainWindow):
         self.be.set_gains(self.kp.value(), self.ki.value(), self.kd.value())
         self.hw_box.setVisible(hw)
         self.btn_pid_run.setVisible(hw)
+        # skenario otomatis hanya untuk simulasi
+        if hw and self.tabs.currentIndex() == self._scn_tab_idx:
+            self.tabs.setCurrentIndex(0)
+        self.tabs.setTabVisible(self._scn_tab_idx, not hw)
+        # skala panah gaya di tampilan 2D: alat asli ~0,7-2 N, simulasi s/d 8 N
+        self.view.Fmax = 2.0 if hw else self.sim.p.Fmax
+        self.p7.setLabel("left", "Throttle" if hw else "F / Fmax", "%")
+        self.ln_fmin.setVisible(hw)
+        self.ln_fmax.setVisible(hw)
+        self._hw_t_prev = None
         self.hw_adv_card.setVisible(hw)
         # Mode hardware: PID, setpoint, noise, impuls & skenario tidak berlaku
         # (tahap 1: ESP32 hanya membaca IMU, motor belum dikendalikan).
@@ -1543,6 +1599,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.be.set_setpoint(self.sp.value())
             self.be.set_load(self.lm.value() / 1000.0, self.lx.value() / 100.0)
         self.hist.clear()
+        self.thr_hist.clear()
         self._clear_event()
         self.prop1_rot = self.prop2_rot = 0.0
         self.frame = 0
@@ -1558,6 +1615,27 @@ class MainWindow(QtWidgets.QMainWindow):
     def _prop_rate(self, thrust):
         """Kecepatan putar propeller (deg/s): idle + proporsional thrust."""
         return self.PROP_IDLE_DPS + max(0.0, thrust) * self.PROP_GAIN_DPS
+
+    def _throttles(self, s):
+        """Throttle kiri/kanan (%) untuk grafik. Hardware: nilai yang
+        dilaporkan ESP32. Simulasi: F / Fmax x 100 (setara persen gaya)."""
+        if self.mode == "hw":
+            f = self.hw.fields()
+            if f and len(f) >= 15:
+                return (f[10], f[11])
+            return (0.0, 0.0)
+        fm = self.sim.p.Fmax
+        return (s[COL_F1] / fm * 100.0, s[COL_F2] / fm * 100.0)
+
+    def _hw_prop_rates(self):
+        """Kecepatan putar visual baling-baling mode hardware (deg/s) dari
+        throttle kiri/kanan yang dilaporkan ESP32. Motor mati -> diam.
+        Skala dipilih agar di bias ~11,5 % kecepatannya mirip mode simulasi."""
+        f = self.hw.fields()
+        if not f or len(f) < 15:
+            return 0.0, 0.0
+        return tuple(0.0 if thr < 0.5 else self.PROP_IDLE_DPS + 90.0 * thr
+                     for thr in (f[10], f[11]))
 
     def _steps_due(self):
         """Jumlah langkah simulasi berdasarkan waktu nyata (perf_counter),
@@ -1580,13 +1658,17 @@ class MainWindow(QtWidgets.QMainWindow):
             return
 
         if self.mode == "hw":
-            # data mengikuti IMU asli; motor belum dikendalikan -> prop diam
+            # data mengikuti IMU asli; baling-baling berputar sesuai throttle
+            # motor yang dilaporkan ESP32 (PID atau tes motor manual)
             s = self.be.poll()
             if s is None:
                 self.stream.heartbeat()
                 return
             if "conn" in self.stream.extra:
                 self.stream.extra["conn"] = 1
+            prev = getattr(self, "_hw_t_prev", None)
+            dtg = 0.0 if prev is None else min(0.1, max(0.0, s[0] - prev))
+            self._hw_t_prev = s[0]
         else:
             n = self._steps_due()
             if n == 0:
@@ -1599,13 +1681,17 @@ class MainWindow(QtWidgets.QMainWindow):
             s = self.be.sample()
             dtg = n * self.be.p.dt
         self.hist.append(s)
+        self.thr_hist.append(self._throttles(s))
         if self.event is not None and len(self.ev_buf) < self.ev_max:
             self.ev_buf.append(s)
         t, th, _meas, sp, _u, F1, F2 = s[:7]
 
         if self.mode == "sim":
-            self.prop1_rot = (self.prop1_rot + self._prop_rate(F1) * dtg) % self.PROP_WRAP
-            self.prop2_rot = (self.prop2_rot + self._prop_rate(F2) * dtg) % self.PROP_WRAP
+            r1, r2 = self._prop_rate(F1), self._prop_rate(F2)
+        else:
+            r1, r2 = self._hw_prop_rates()
+        self.prop1_rot = (self.prop1_rot + r1 * dtg) % self.PROP_WRAP
+        self.prop2_rot = (self.prop2_rot + r2 * dtg) % self.PROP_WRAP
         self.stream.send(th, self.prop1_rot, self.prop2_rot, sp, _u, self.be.load_m, self.be.load_x, F1, F2)
 
         self.view.set_state(th, sp, F1, F2, self.be.load_m, self.be.load_x,
@@ -1631,6 +1717,10 @@ class MainWindow(QtWidgets.QMainWindow):
         self.c_ut.setData(x, a[m, COL_U])
         self.c_err.setData(x, a[m, COL_SP] - a[m, COL_TH])
         self.c_omega.setData(x, a[m, COL_W])
+        th_arr = np.asarray(self.thr_hist)
+        if len(th_arr) == len(a):
+            self.c_thr1.setData(x, th_arr[m, 0])
+            self.c_thr2.setData(x, th_arr[m, 1])
         self.p1.setXRange(t - self.WINDOW_S, t, padding=0)
 
         peak = float(np.max(np.abs(a[m][:, [COL_TH, COL_MEAS, COL_SP]])))
