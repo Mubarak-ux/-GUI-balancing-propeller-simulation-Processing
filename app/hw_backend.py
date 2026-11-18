@@ -207,6 +207,17 @@ class HardwareBackend:
         """Minta ESP32 menghitung ulang bias gyro (~2 s, alat harus diam)."""
         return self.send_command("c")
 
+    def set_motors(self, left_pct, right_pct):
+        """Kirim throttle motor kiri/kanan (0..100 %) ke firmware motor_test.
+        Harus dikirim berulang (heartbeat); firmware mematikan motor jika
+        tidak ada perintah > 500 ms."""
+        l = max(0.0, min(100.0, float(left_pct)))
+        r = max(0.0, min(100.0, float(right_pct)))
+        return self.send_command(f"M,{l:.1f},{r:.1f}\n")
+
+    def stop_motors(self):
+        return self.send_command("x\n")
+
     @property
     def receiving(self):
         return self.is_open and (time.monotonic() - self._last_rx) < self.STALE_S

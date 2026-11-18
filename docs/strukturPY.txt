@@ -16,7 +16,7 @@ VERSI 2/
 │   ├── processing_stream.py         # Pengirim telemetri UDP ke viewer Processing 3D
 │   ├── sim_backend.py               # Model matematika dinamika fisika seesaw & motor
 │   ├── theme.py                     # Stylesheet QSS tema antarmuka modern
-│   └── __init__.py
+│   └── __init__.pyc
 ├── BalancingPropellerIMU/            # Sketch visualizer 3D Processing (P3D HiDPI)
 │   ├── BalancingPropellerIMU.pde    # Setup utama, draw loop, dan state telemetri
 │   ├── CameraIMU.pde                # Navigasi kamera orbit 3D, pencahayaan, mouse & keyboard

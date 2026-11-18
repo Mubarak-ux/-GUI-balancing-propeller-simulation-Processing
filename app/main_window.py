@@ -195,6 +195,8 @@ class MainWindow(QtWidgets.QMainWindow):
             self.show()
 
     def closeEvent(self, event):
+        if self.hw.is_open:
+            self.hw.stop_motors()
         self.hw.stop_recording()
         self.hw.disconnect()
         self.stream.close()
@@ -515,7 +517,9 @@ class MainWindow(QtWidgets.QMainWindow):
     def _build_panel(self):
         scroll = QtWidgets.QScrollArea()
         scroll.setWidgetResizable(True)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        # Fallback: jika ada konten yang tetap lebih lebar, bisa digulir
+        # (bukan terpotong diam-diam).
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         scroll.setMinimumWidth(340)
         scroll.setMaximumWidth(560)
 
@@ -670,11 +674,20 @@ class MainWindow(QtWidgets.QMainWindow):
         self.btn_conn = QtWidgets.QPushButton("Connect")
         self.btn_conn.setObjectName("Primary")
         self.btn_conn.clicked.connect(self._toggle_connect)
+        # Nama port CH340/CP210x panjang -> combo diberi lebar fleksibel
+        # (boleh menyusut, teks dipotong) supaya tidak melebarkan panel.
+        self.cb_port.setMinimumContentsLength(6)
+        self.cb_port.setSizePolicy(QtWidgets.QSizePolicy.Ignored,
+                                   QtWidgets.QSizePolicy.Fixed)
+        self.btn_conn.setMinimumWidth(92)   # muat untuk "Disconnect"
         g.addWidget(QtWidgets.QLabel("Port"), row, 0)
-        g.addWidget(self.cb_port, row, 1)
-        g.addWidget(b_refresh, row, 2)
-        g.addWidget(self.btn_conn, row, 3)
+        g.addWidget(self.cb_port, row, 1, 1, 3)
         row += 1
+        g.addWidget(b_refresh, row, 0)
+        g.addWidget(self.btn_conn, row, 1, 1, 3)
+        row += 1
+        g.setColumnStretch(1, 1)
+        g.setColumnStretch(3, 1)
 
         # --- arah sudut (sudut selalu kolom f2 dari ESP32) ---
         self.chk_inv = QtWidgets.QCheckBox("Balik arah sudut")
@@ -714,6 +727,50 @@ class MainWindow(QtWidgets.QMainWindow):
         g.addWidget(self.chk_load, row, 0, 1, 4)
         row += 1
 
+        # --- tes motor (ukur Fmax F1/F2) ---
+        self.chk_motor = QtWidgets.QCheckBox("Aktifkan tes motor")
+        self.chk_motor.setToolTip("Butuh firmware esp32_motor_test.\n"
+                                  "HATI-HATI: baling-baling berputar!")
+        self.chk_motor.toggled.connect(self._on_motor_enable)
+        g.addWidget(self.chk_motor, row, 0, 1, 4)
+        row += 1
+        self.sl_motor = []
+        self.lb_motor = []
+        self.bar_motor = []
+        for name in ("Kiri (CCW, IO26)", "Kanan (CW, IO25)"):
+            lb = QtWidgets.QLabel(f"{name}: 0 %")
+            sl = QtWidgets.QSlider(Qt.Horizontal)
+            sl.setRange(0, 1000)          # 0.1 % per langkah
+            sl.setEnabled(False)
+            sl.valueChanged.connect(self._on_motor_slider)
+            g.addWidget(lb, row, 0, 1, 4)
+            row += 1
+            g.addWidget(sl, row, 0, 1, 4)
+            row += 1
+            # indikator PWM: panjang bar = throttle, teks = pulsa & duty cycle
+            bar = QtWidgets.QProgressBar()
+            bar.setRange(0, 1000)
+            bar.setFixedHeight(16)
+            bar.setAlignment(Qt.AlignCenter)
+            bar.setToolTip("Sinyal PWM ke ESC (50 Hz): pulsa 1000 µs = 0 %,\n"
+                           "2000 µs = 100 %. Duty = pulsa / 20 ms.")
+            g.addWidget(bar, row, 0, 1, 4)
+            row += 1
+            self.lb_motor.append((lb, name))
+            self.sl_motor.append(sl)
+            self.bar_motor.append(bar)
+        self.btn_motor_stop = QtWidgets.QPushButton("STOP MOTOR")
+        self.btn_motor_stop.setObjectName("Danger")
+        self.btn_motor_stop.setEnabled(False)
+        self.btn_motor_stop.clicked.connect(self._motor_stop)
+        g.addWidget(self.btn_motor_stop, row, 0, 1, 4)
+        row += 1
+        # heartbeat: firmware mematikan motor jika perintah berhenti
+        self.motor_timer = QtCore.QTimer(self)
+        self.motor_timer.timeout.connect(self._motor_heartbeat)
+        self.motor_timer.start(100)
+        self._on_motor_slider()          # isi teks awal indikator PWM
+
         # --- perekaman ---
         self.ed_label = QtWidgets.QLineEdit()
         self.ed_label.setPlaceholderText("Label percobaan, mis. diam_kiri")
@@ -746,6 +803,51 @@ class MainWindow(QtWidgets.QMainWindow):
         self._update_hw_status()
         return card
 
+    # --- tes motor ---
+    def _motor_values(self):
+        return [s.value() / 10.0 for s in self.sl_motor]
+
+    def _on_motor_slider(self, *_):
+        for (lb, name), bar, v in zip(self.lb_motor, self.bar_motor,
+                                      self._motor_values()):
+            lb.setText(f"{name}: {v:.1f} %")
+            us = 1000.0 + 10.0 * v            # throttle % -> pulsa ESC (µs)
+            duty = us / 20000.0 * 100.0       # 50 Hz -> periode 20 ms
+            bar.setValue(int(round(v * 10)))
+            bar.setFormat(f"PWM {us:.0f} µs  |  duty {duty:.2f} %")
+        if self.chk_motor.isChecked() and self.hw.is_open:
+            self.hw.set_motors(*self._motor_values())
+
+    def _motor_stop(self):
+        for s in self.sl_motor:
+            s.blockSignals(True)
+            s.setValue(0)
+            s.blockSignals(False)
+        self._on_motor_slider()
+        if self.hw.is_open:
+            self.hw.stop_motors()
+
+    def _on_motor_enable(self, on):
+        ok = bool(on) and self.hw.is_open
+        if on and not self.hw.is_open:
+            self.chk_motor.blockSignals(True)
+            self.chk_motor.setChecked(False)
+            self.chk_motor.blockSignals(False)
+            self.hw.error = "Connect ke ESP32 dulu sebelum tes motor."
+        for s in self.sl_motor:
+            s.setEnabled(ok)
+        self.btn_motor_stop.setEnabled(ok)
+        if not ok:
+            self._motor_stop()
+
+    def _motor_heartbeat(self):
+        if not self.chk_motor.isChecked():
+            return
+        if not self.hw.is_open:        # koneksi putus -> reset UI ke 0
+            self.chk_motor.setChecked(False)
+            return
+        self.hw.set_motors(*self._motor_values())
+
     def _refresh_ports(self):
         cur = self.cb_port.currentData()
         self.cb_port.clear()
@@ -761,6 +863,7 @@ class MainWindow(QtWidgets.QMainWindow):
         if self.hw.is_open:
             if self.hw.recording:
                 self._toggle_record()
+            self.chk_motor.setChecked(False)     # motor 0 sebelum putus
             self.hw.disconnect()
         else:
             port = self.cb_port.currentData()
@@ -908,6 +1011,7 @@ class MainWindow(QtWidgets.QMainWindow):
     def set_mode(self, mode):
         if mode == self.mode:
             return
+        self.chk_motor.setChecked(False)       # motor 0 saat ganti mode
         self.stop_scenarios("Dihentikan (ganti sumber data)" if self.scn else None)
         if mode != "hw" and self.hw.recording:
             self._toggle_record()
