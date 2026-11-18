@@ -15,7 +15,7 @@ Qt = QtCore.Qt
 class BeamView(QtWidgets.QWidget):
     impulse_requested = QtCore.Signal(float)
     FOOTER_H = 60
-    LIMIT_DEG = 30.0     # batas mekanik +/-30 deg (sinkron dengan Params.stop)
+    LIMIT_DEG = 33.0     # batas mekanik +/-33 deg (sinkron dengan Params.stop)
     BEAM_HALF = 0.27     # m, setengah panjang batang 54 cm (terukur)
     PROP_RADIUS = 0.127  # m, propeler 1045 = 10 inci -> jari-jari 5 inci
 

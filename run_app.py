@@ -58,7 +58,7 @@ def main():
 
     print()
     print("  Mode dapat diubah kapan saja di GUI pada kartu 'Sumber Data' (Simulasi / Hardware).")
-    print("  Jika mode Hardware: pilih port ESP32 -> Connect (firmware: firmware/esp32_imu_test).")
+    print("  Jika mode Hardware: pilih port ESP32 -> Connect (firmware: firmware/esp32_pid).")
     print()
     return run_gui(initial_mode=args.mode, seed=args.seed)
 

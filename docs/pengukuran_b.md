@@ -39,6 +39,29 @@ dengan `J = 0,0140 kg·m²`, sehingga **`b = 0,0280 × α`**.
 
 ---
 
+## 3a. Cek ulang (2026-11-18)
+
+Data `hw_20261111_211524` difit ulang dengan model yang sama, J = 0,0140 kg·m².
+
+| Event | α (1/s) | ω_d (rad/s) | R² | b = 2·J·α |
+|---|---|---|---|---|
+| Dorongan 2 (+14,4°), jendela 5 s | 1,158 | 1,187 | 0,970 | **0,0324** |
+| Dorongan 1 (−4,8°), jendela 5 s | 1,612 | 1,397 | 0,929 | 0,0451 |
+
+- **Rumus `b = 2·J·α` benar** untuk sistem teredam kurang (`θ̈ + (b/J)θ̇ + (k/J)θ = 0`, α = laju peluruhan amplop).
+- Dorongan 2 (amplitudo besar, R² 0,970) cocok dengan angka lama (α 1,13 → b 0,032).
+- Dorongan 1 (amplitudo kecil, −4,8°) **sensitif ke jendela fit**: α berkisar 1,34–1,61, sehingga b 0,037–0,045. Maka rentang wajar b sebaiknya dilonggarkan: **0,032 – 0,045**; nilai pakai tetap **b ≈ 0,033** (berpatokan pada event 2).
+- **Parameter baru dari F tidak mengubah `b`:** `b` berasal dari uji ayunan (motor mati), tidak bergantung pada F atau throttle 8–15 %. J = 0,0140 juga tidak berubah.
+
+**Konstanta pemulih (hasil sampingan).** Dari event 2: `ω_n² = ω_d² + α² = 2,75`, jadi
+`k = J·ω_n² ≈ 0,039 N·m/rad`, damping ratio `ζ = α/ω_n ≈ 0,70`.
+Bila k berasal dari pusat massa di bawah pivot: `l = k/(m·g) = 0,039/(0,393·9,81) ≈ 10 mm`.
+Torsi pemulih pada sudut 33° (batas mekanik) ≈ 0,022 N·m, sekitar **10 %** dari torsi maksimum motor
+(0,216 N·m, lihat `pengukuran_F.md`). Kecil tapi tidak nol; asumsi `l = 0` di simulasi
+sedikit mengabaikannya.
+
+---
+
 ## 4. Langkah lanjut (opsional)
 
 Ukur `J` langsung lewat **bandul bifilar** `J = T²·m·g·d² / (4π²·L)`,

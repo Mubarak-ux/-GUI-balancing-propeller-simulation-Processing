@@ -17,7 +17,7 @@ class Params:
     b = 0.033                # N.m.s/rad, redaman poros (ukur: docs/pengukuran_b.md)
     Fmax = 8.0               # N, thrust maks per motor (tebakan)
     tau = 0.10               # s, lag motor + propeler (orde-1, tebakan)
-    stop = math.radians(30)  # batas mekanik sudut (terukur +/-30 deg)
+    stop = math.radians(33)  # batas mekanik sudut (terukur +/-33 deg)
     dt = 0.005               # s, periode kontrol / integrasi (200 Hz)
 # ----------------------------------------------------------------------------
 # BACKEND SIMULASI
@@ -31,7 +31,7 @@ class SimBackend:
     # Gain default hasil tuning pada model terukur (L, J0, Fmax, tau di atas),
     # diuji dengan 5 skenario GUI + noise 0.2 deg:
     #   step +-10 deg : overshoot ~17 %, settling ~4 s
-    #   beban 400 g @ 15 cm : deviasi ~25 deg, tidak menabrak batas +-30 deg
+    #   beban 400 g @ 15 cm : deviasi ~25 deg, tidak menabrak batas +-33 deg
     # Batas stabil (tanpa filter D): Kp < 0.2 + 11.4*Kd.
     DEFAULT_GAINS = (1.00, 0.80, 0.35)   # %/deg, %/(deg.s), %/(deg/s)
 

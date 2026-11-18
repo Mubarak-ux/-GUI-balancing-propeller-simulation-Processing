@@ -27,7 +27,7 @@ Meskipun visualizer 3D di-upgrade sepenuhnya, **antarmuka GUI Python (PySide6) s
 | **Pemicu Impuls Gangguan (*Disturbance*)** | ❌ Belum Ada | ✅ **Tersedia Lengkap** (Tombol UI, Klik Batang 2D, Tombol D, Space di 3D) | Menguji *robustness* PID saat sistem ditabrak torsi mendadak |
 | **Vektor Gaya Dorong (*Thrust Vector*)** | ❌ Tidak Ada | ✅ **Panah 3D Dinamis** ($F_1$ & $F_2$) | Menampilkan besar gaya dorong tiap motor secara real-time |
 | **Visualisasi Putaran Baling-baling** | Rotasi geometri biasa | **Motion Blur Spinning Disc** dinamis | Efek blur piringan berkecepatan tinggi mengikuti RPM motor |
-| **Busur Derajat Sudut (*Protractor Arc*)** | ❌ Hanya ada di 2D | ✅ **Ada di 2D dan 3D** | Skala busur $-30^\circ$ s/d $+30^\circ$ (batas mekanik terukur) dengan jarum aktual & setpoint |
+| **Busur Derajat Sudut (*Protractor Arc*)** | ❌ Hanya ada di 2D | ✅ **Ada di 2D dan 3D** | Skala busur $-33^\circ$ s/d $+33^\circ$ (batas mekanik terukur) dengan jarum aktual & setpoint |
 | **Preset Kamera Navigasi** | Mengikuti orbit standar Blender | Tombol `1` (Depan), `2` (Samping), `3` (Atas), `4` (Bawah), `R` (Reset) | Tampilan Depan (1) persis sejajar dengan tampilan 2D GUI |
 | **Modularitas Skrip 3D** | 1 file script monolithic (`blender_receiver.py`) | **5 Modul PDE Terpisah** (`NetworkIMU`, `CameraIMU`, `ModelIMU`, `HudIMU`, `BalancingPropellerIMU`) | Struktur kode terorganisir rapi per fungsi kerja |
 | **Kemudahan Eksekusi** | Harus membuka Blender manual $\to$ Text Editor $\to$ Run Script | **1-Klik Launcher** (`run_app.bat` / `run_app.py`) | Otomatis meluncurkan viewer 3D dan GUI Python bersamaan |
@@ -139,7 +139,7 @@ VERSI 2/
 │   ├── dokumentasiPY.png             # Tangkapan layar GUI Python
 │   ├── dokumentasiPDE.png            # Tangkapan layar visualizer Processing 3D
 │   └── assets/                       # Gambar tampak alat (atas/depan/samping/bawah)
-├── firmware/                         # Firmware ESP32 (esp32_imu_test: baca IMU)
+├── firmware/                         # Firmware ESP32 (esp32_pid: IMU + motor + PID; esp32_imu_test: tes IMU; esp32_motor_only: tes/kalibrasi ESC)
 ├── data/                             # Hasil rekaman CSV (tidak di-commit)
 ├── run_app.py                        # Launcher utama Python (Simulasi & Hardware)
 └── run_app.bat                       # Script batch 1-klik untuk Windows (Launcher Utama)

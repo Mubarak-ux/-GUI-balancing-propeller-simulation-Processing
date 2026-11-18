@@ -30,7 +30,7 @@ VERSI 2/
 │   ├── ringkasan_pengukuran.md      # Data terukur parameter fisik alat nyata
 │   ├── versi2.md                    # Laporan upgrade dan komparasi VERSI 1 vs VERSI 2
 │   └── README.md                    # Indeks panduan dokumentasi
-├── firmware/                        # Firmware ESP32 (esp32_imu_test: baca IMU)
+├── firmware/                        # Firmware ESP32 (esp32_pid: IMU + motor + PID; esp32_imu_test: tes IMU; esp32_motor_only: tes/kalibrasi ESC)
 ├── requirements.txt                 # Daftar dependensi library Python
 ├── README.md                        # Dokumentasi utama proyek & panduan pengoperasian
 ├── run_app.bat                      # Launcher 1-klik Windows (Processing 3D + GUI Python)

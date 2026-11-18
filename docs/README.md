@@ -28,7 +28,7 @@ Folder ini berisi seluruh catatan teknis & laporan proyek. README utama
 | `L` (poros → propeller) | 0,25 m | terukur |
 | `J0` (momen inersia) | 0,0140 kg·m² | hitungan massa + geometri |
 | `b` (redaman poros) | 0,033 ± 0,002 N·m·s/rad | uji ayunan (motor mati) |
-| `stop` (batas mekanik) | ±30° | terukur |
+| `stop` (batas mekanik) | ±33° | terukur |
 | `Fmax` (thrust maks) | 8 N | asumsi (belum dikalibrasi) |
 | `tau` (lag motor) | 0,10 s | asumsi (belum diukur) |
 

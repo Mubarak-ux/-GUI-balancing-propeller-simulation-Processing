@@ -121,7 +121,7 @@ class Params:
     b    = 0.033                   # N.m.s/rad, uji ayunan: b = 2*J0*alpha (docs/pengukuran_b.md)
     Fmax = 8.0                     # N, TEBAKAN batas kerja -> ukur dari tes thrust
     tau  = 0.10                    # s, lag motor + propeller (orde-1), TEBAKAN
-    stop = math.radians(30)        # batas mekanik +/-30 deg (terukur)
+    stop = math.radians(33)        # batas mekanik +/-33 deg (terukur)
     dt   = 0.005                   # s, 200 Hz
 ```
 

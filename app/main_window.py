@@ -96,6 +96,15 @@ METRIC_COLORS = {
 # JENDELA UTAMA
 # ----------------------------------------------------------------------------
 class MainWindow(QtWidgets.QMainWindow):
+    # Gain awal mode hardware (%/deg, %/(deg.s), %/(deg/s)). Dari model terukur
+    # (J, b, k, F(throttle), bias tengah rentang, ESC 50 Hz). Data PID nyata
+    # 18-11-2026 (Kp 3/Ki 1.5/Kd 1) berosilasi +/-3.6 deg, periode 1.1 s ->
+    # cocok dengan lag motor+baling ~0.3-0.5 s + delay ~80 ms (bukan 0.1 s).
+    # Hasil identifikasi & tuning robust (lihat docs/kontrol_pid/): plant
+    # tidak stabil alami (k ~ -0.05..-0.08 N.m/rad). Kp 2.5 menambah osilasi,
+    # Kp 2.0 + Ki 1.5 + I-zone 6 deg memberi std terkecil & error tunak ~0.2 deg.
+    HW_GAINS = (2.0, 1.5, 1.0)
+
     TICK_MS = 20            # 50 Hz refresh UI
     WINDOW_S = 8.0          # rentang grafik (detik)
     EVENT_MAX_S = 60.0      # maksimum data yang disimpan per event
@@ -196,6 +205,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def closeEvent(self, event):
         if self.hw.is_open:
+            self.hw.send_pid(False)
             self.hw.stop_motors()
         self.hw.stop_recording()
         self.hw.disconnect()
@@ -727,9 +737,40 @@ class MainWindow(QtWidgets.QMainWindow):
         g.addWidget(self.chk_load, row, 0, 1, 4)
         row += 1
 
+        # --- hardware tidak memakai beban simulasi: sembunyikan & nonaktifkan ---
+        self.chk_load.setChecked(False)
+        self.chk_load.setVisible(False)
+
+        # --- F-max: batas atas throttle motor (8 % .. 15 %) ---
+        self.fmax_unlocked = False
+        self.fmax = Param("F-max", 8.0, 15.0, 15.0, 0.5, "%", 1)
+        self.fmax.setToolTip("Throttle maksimum yang boleh dipakai motor (8–15 %).\n"
+                             "Slider tes motor dibatasi sampai nilai ini, dan nilai\n"
+                             "ini juga dikirim ke ESP32 sebagai batas keselamatan.")
+        self.fmax.set_locked(True)
+        self.fmax.changed.connect(self._on_fmax_changed)
+        g.addWidget(self.fmax, row, 0, 1, 4)
+        row += 1
+        self.btn_fmax_lock = QtWidgets.QPushButton("\U0001f512  Buka kunci F-max…")
+        self.btn_fmax_lock.setToolTip("Mengubah F-max butuh konfirmasi, hanya bisa saat motor\n"
+                                      "berhenti, dan terkunci lagi otomatis setelah 15 detik.")
+        self.btn_fmax_lock.clicked.connect(self._toggle_fmax_lock)
+        g.addWidget(self.btn_fmax_lock, row, 0, 1, 4)
+        row += 1
+        # info daya koreksi PID untuk F-max yang dipilih
+        self.lb_authority = QtWidgets.QLabel()
+        self.lb_authority.setObjectName("EventLabel")
+        self.lb_authority.setWordWrap(True)
+        g.addWidget(self.lb_authority, row, 0, 1, 4)
+        row += 1
+        self.fmax_relock = QtCore.QTimer(self)
+        self.fmax_relock.setSingleShot(True)
+        self.fmax_relock.setInterval(15000)
+        self.fmax_relock.timeout.connect(self._lock_fmax)
+
         # --- tes motor (ukur Fmax F1/F2) ---
         self.chk_motor = QtWidgets.QCheckBox("Aktifkan tes motor")
-        self.chk_motor.setToolTip("Butuh firmware esp32_motor_test.\n"
+        self.chk_motor.setToolTip("Butuh firmware esp32_pid.\n"
                                   "HATI-HATI: baling-baling berputar!")
         self.chk_motor.toggled.connect(self._on_motor_enable)
         g.addWidget(self.chk_motor, row, 0, 1, 4)
@@ -765,11 +806,49 @@ class MainWindow(QtWidgets.QMainWindow):
         self.btn_motor_stop.clicked.connect(self._motor_stop)
         g.addWidget(self.btn_motor_stop, row, 0, 1, 4)
         row += 1
+        # --- kontrol PID (butuh firmware esp32_pid) ---
+        self.pid_run = False
+        self.btn_pid_run = QtWidgets.QPushButton("▶  Aktifkan PID")
+        self.btn_pid_run.setObjectName("Primary")
+        self.btn_pid_run.setToolTip("Kontrol sudut batang oleh ESP32 (butuh firmware esp32_pid).\n"
+                                    "Motor berputar di sekitar bias 11 %, rentang 8–F-max.\n"
+                                    "Setpoint & gain Kp/Ki/Kd diambil dari panel ini.")
+        self.btn_pid_run.clicked.connect(self._toggle_pid_run)
+        g.addWidget(self.btn_pid_run, row, 0, 1, 4)
+        row += 1
+        # trim / feedforward: melawan torsi tetap (batang berat sebelah,
+        # thrust kiri-kanan beda) supaya integral tidak perlu "menunggu".
+        self.trim = Param("Trim", -60.0, 60.0, 0.0, 1.0, "%", 1)
+        self.trim.setToolTip("Feedforward u (%) yang selalu ditambahkan ke keluaran PID.\n"
+                             "Isi dengan nilai I saat batang sudah diam di setpoint\n"
+                             "(tombol di bawah) agar respons tidak lambat/berayun.")
+        self.trim.changed.connect(self._on_trim_changed)
+        g.addWidget(self.trim, row, 0, 1, 4)
+        row += 1
+        self.btn_trim_from_i = QtWidgets.QPushButton("Trim ← nilai I sekarang")
+        self.btn_trim_from_i.setToolTip("Pindahkan nilai integral saat ini ke Trim, lalu nolkan\n"
+                                        "integral. Pakai saat PID aktif dan batang sudah tenang.")
+        self.btn_trim_from_i.clicked.connect(self._trim_from_integral)
+        g.addWidget(self.btn_trim_from_i, row, 0, 1, 4)
+        row += 1
+        # batas mati sudut: motor dimatikan jika |sudut| melebihi nilai ini
+        self.cut = Param("Batas mati", 29.0, 33.0, 32.0, 0.5, "°", 1)
+        self.cut.setToolTip("Jika |sudut| melebihi nilai ini saat PID aktif, ESP32\n"
+                            "mematikan PID dan kedua motor. Batas mekanik rig ±33°.")
+        self.cut.changed.connect(self._on_cutoff_changed)
+        g.addWidget(self.cut, row, 0, 1, 4)
+        row += 1
+        self.btn_cut_off = QtWidgets.QPushButton("Batas mati: AKTIF")
+        self.btn_cut_off.setToolTip("Matikan/hidupkan batas mati sudut. Saat dimatikan,\n"
+                                    "PID tidak berhenti walau batang menyentuh batas mekanik.")
+        self.btn_cut_off.clicked.connect(self._toggle_cutoff)
+        g.addWidget(self.btn_cut_off, row, 0, 1, 4)
+        row += 1
         # heartbeat: firmware mematikan motor jika perintah berhenti
         self.motor_timer = QtCore.QTimer(self)
         self.motor_timer.timeout.connect(self._motor_heartbeat)
         self.motor_timer.start(100)
-        self._on_motor_slider()          # isi teks awal indikator PWM
+        self._apply_fmax(self.fmax.value())   # batasi slider motor & isi indikator PWM
 
         # --- perekaman ---
         self.ed_label = QtWidgets.QLineEdit()
@@ -803,11 +882,94 @@ class MainWindow(QtWidgets.QMainWindow):
         self._update_hw_status()
         return card
 
+    # --- F-max (batas throttle motor) ---
+    def _motors_running(self):
+        return self.chk_motor.isChecked() and any(v > 0 for v in self._motor_values())
+
+    def _apply_fmax(self, v):
+        """Terapkan batas F-max ke slider/indikator motor dan kirim ke ESP32."""
+        v = max(8.0, min(15.0, float(v)))
+        top = int(round(v * 10))
+        for s, bar in zip(self.sl_motor, self.bar_motor):
+            s.setRange(0, top)
+            bar.setRange(0, top)
+        self._on_motor_slider()
+        if self.hw.is_open:
+            self.hw.set_fmax(v)
+        bias, R, tau = self._pid_authority(v)
+        txt = (f"PID: bias {bias:.1f} %, koreksi ±{R:.1f} % "
+               f"→ torsi maks ≈ {tau:.3f} N·m")
+        if v < 12.0:
+            txt += ("\n⚠ F-max kecil: daya koreksi lemah, batang mungkin tidak "
+                    "bisa terangkat dari batas mekanik. Disarankan F-max 15 %.")
+        self.lb_authority.setText(txt)
+
+    def _pid_warn_text(self):
+        bias, R, tau = self._pid_authority(self.fmax.value())
+        txt = (f"Motor akan langsung berputar di sekitar {bias:.1f} % "
+               f"(koreksi ±{R:.1f} %) dan mengendalikan batang.\n\n"
+               "• Jauhkan tangan dari baling-baling.\n"
+               "• Gain: Ki harus > 0 agar sudut benar-benar sampai setpoint.")
+        if self.fmax.value() < 12.0:
+            txt += (f"\n\n⚠ F-max {self.fmax.value():.1f} % membuat torsi koreksi hanya "
+                    f"≈ {tau:.3f} N·m. Batang mungkin tidak bisa terangkat. "
+                    "Disarankan F-max 15 %.")
+        return txt
+
+    @staticmethod
+    def _pid_authority(fmax):
+        """Bias, rentang koreksi (%) dan torsi maksimum (N.m) PID hardware.
+        Sama dengan firmware: bias = (8 + Fmax)/2, R = (Fmax - 8)/2;
+        F(u) = 0.1241*u - 0.316 N (docs/pengukuran_F.md), L = 0.25 m."""
+        bias = 0.5 * (8.0 + fmax)
+        R = 0.5 * (fmax - 8.0)
+        tau = 0.25 * 2 * 0.1241 * R
+        return bias, R, tau
+
+    def _on_fmax_changed(self, v):
+        if self._motors_running():          # pengaman: tak boleh berubah saat motor jalan
+            self._lock_fmax()
+            return
+        self.fmax_relock.start()            # mulai ulang hitung mundur kunci
+        self._apply_fmax(v)
+
+    def _toggle_fmax_lock(self):
+        if self.fmax_unlocked:
+            self._lock_fmax()
+            return
+        if self._motors_running():
+            QtWidgets.QMessageBox.information(
+                self, "F-max",
+                "Hentikan motor dulu (tekan STOP MOTOR) sebelum mengubah F-max.")
+            return
+        ans = QtWidgets.QMessageBox.warning(
+            self, "Ubah F-max?",
+            "F-max adalah batas atas throttle motor (8–15 %).\n\n"
+            "Menaikkannya membuat motor lebih kuat dan bisa mengubah hasil "
+            "uji/tuning.\nPastikan area baling-baling aman.\n\n"
+            "Buka kunci F-max? (terkunci lagi otomatis setelah 15 detik)",
+            QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
+            QtWidgets.QMessageBox.No)
+        if ans != QtWidgets.QMessageBox.Yes:
+            return
+        self.fmax_unlocked = True
+        self.fmax.set_locked(False)
+        self.btn_fmax_lock.setText("\U0001f513  Kunci F-max")
+        self.fmax_relock.start()
+
+    def _lock_fmax(self):
+        self.fmax_unlocked = False
+        self.fmax_relock.stop()
+        self.fmax.set_locked(True)
+        self.btn_fmax_lock.setText("\U0001f512  Buka kunci F-max…")
+
     # --- tes motor ---
     def _motor_values(self):
         return [s.value() / 10.0 for s in self.sl_motor]
 
     def _on_motor_slider(self, *_):
+        if self.fmax_unlocked and any(v > 0 for v in self._motor_values()):
+            self._lock_fmax()               # motor mulai jalan -> kunci F-max
         for (lb, name), bar, v in zip(self.lb_motor, self.bar_motor,
                                       self._motor_values()):
             lb.setText(f"{name}: {v:.1f} %")
@@ -837,10 +999,157 @@ class MainWindow(QtWidgets.QMainWindow):
         for s in self.sl_motor:
             s.setEnabled(ok)
         self.btn_motor_stop.setEnabled(ok)
+        if ok:
+            self.hw.set_fmax(self.fmax.value())   # sinkronkan batas ke ESP32
         if not ok:
             self._motor_stop()
 
+    # --- trim / feedforward ---
+    def _on_trim_changed(self, v):
+        self.hw.trim = float(v)
+        if self.pid_run:
+            self.hw.send_pid(True)
+
+    def _trim_from_integral(self):
+        if not (self.pid_run and self.hw.pid_active):
+            self.hw.error = "Trim ← I hanya bisa saat PID aktif dan batang sudah tenang."
+            return
+        new = max(-60.0, min(60.0, self.trim.value() + self.hw.i_term))
+        self.trim.set_value_silent(new)
+        self.hw.trim = new
+        self.hw.send_pid(True)          # kirim trim baru dulu,
+        self.hw.reset_integral()        # lalu nolkan integral -> u total tetap sama
+
+    # --- batas mati sudut ---
+    def _on_cutoff_changed(self, v):
+        self.hw.cutoff_deg = float(v)
+        if self.pid_run:
+            self.hw.send_pid(True)
+
+    def _toggle_cutoff(self):
+        if self.hw.cutoff_on:               # mematikan batas -> minta konfirmasi
+            ans = QtWidgets.QMessageBox.warning(
+                self, "Matikan batas mati?",
+                "Tanpa batas mati, PID TIDAK berhenti walau batang menyentuh batas "
+                "mekanik (±33°).\n\nFailsafe heartbeat dan pengaman data IMU "
+                "tetap aktif. Gunakan tombol Hentikan PID bila perlu.\n\n"
+                "Matikan batas mati sudut?",
+                QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
+                QtWidgets.QMessageBox.No)
+            if ans != QtWidgets.QMessageBox.Yes:
+                return
+            self.hw.cutoff_on = False
+        else:
+            self.hw.cutoff_on = True
+        on = self.hw.cutoff_on
+        self.btn_cut_off.setText("Batas mati: AKTIF" if on else "Batas mati: MATI ⚠")
+        self.cut.setEnabled(on)
+        if self.pid_run:
+            self.hw.send_pid(True)
+
+    # --- kontrol PID hardware ---
+    def _toggle_pid_run(self):
+        self._set_pid_run(not self.pid_run, ask=True)
+
+    def _set_pid_run(self, on, ask=False):
+        if on == self.pid_run:
+            return
+        if on:
+            if not (self.hw.is_open and self.hw.receiving):
+                self.hw.error = "Connect ke ESP32 (firmware esp32_pid) dulu."
+                return
+            if len(self.hw.fields() or []) < 15:
+                self.hw.error = ("Data ESP32 belum berformat PID: upload firmware "
+                                 "esp32_pid dulu.")
+                return
+            if ask:
+                ans = QtWidgets.QMessageBox.warning(
+                    self, "Aktifkan PID?",
+                    self._pid_warn_text() + "\n\nLanjutkan?",
+                    QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
+                    QtWidgets.QMessageBox.No)
+                if ans != QtWidgets.QMessageBox.Yes:
+                    return
+            self.chk_motor.setChecked(False)          # tes manual dimatikan
+            self.chk_motor.setEnabled(False)
+            self._lock_fmax()
+            self.btn_fmax_lock.setEnabled(False)
+            self.pid_run = True
+            self._pid_t0 = time.monotonic()
+            self.hw.other_lines.clear()       # hanya pesan sejak PID dinyalakan
+            self.btn_pid_run.setText("■  Hentikan PID")
+            self.btn_pid_run.setObjectName("Danger")
+        else:
+            self.pid_run = False
+            if self.hw.is_open:
+                self.hw.send_pid(False)
+                self.hw.stop_motors()
+            self.chk_motor.setEnabled(True)
+            self.btn_fmax_lock.setEnabled(True)
+            self.btn_pid_run.setText("▶  Aktifkan PID")
+            self.btn_pid_run.setObjectName("Primary")
+        self.btn_pid_run.style().unpolish(self.btn_pid_run)
+        self.btn_pid_run.style().polish(self.btn_pid_run)
+        self.sp.setEnabled(self.pid_run)
+        self.sp.set_locked(False)       # anak widget selalu terbuka; yang mengatur setEnabled induk
+        if not self.pid_run:
+            self.sp.set_value_silent(0.0)
+            self.hw.set_setpoint(0.0)
+        self._apply_pid_lock()
+        if self.pid_run:
+            self.hw.set_gains(self.kp.value(), self.ki.value(), self.kd.value())
+            self.hw.send_pid(True)
+
+    def _pid_failure_reason(self):
+        """Terjemahkan pesan teks ESP32 sejak PID dinyalakan menjadi alasan
+        yang mudah dipahami."""
+        lines = list(self.hw.other_lines)
+        joined = " | ".join(lines)
+        if any("ditolak" in l for l in lines):
+            l = next(l for l in reversed(lines) if "ditolak" in l)
+            return (f"ESP32 menolak menyalakan PID.\n\n“{l}”\n\n"
+                    "Tahan batang lebih mendekati datar lalu coba lagi, atau "
+                    "matikan “Batas mati” untuk mengabaikan batas sudut awal.")
+        if any("PID MATI" in l for l in lines):
+            l = next(l for l in reversed(lines) if "PID MATI" in l)
+            hint = ""
+            if "batas mati" in l or "batas keselamatan" in l:
+                hint = ("\n\nSudut batang melewati batas mati. Cek arah motor "
+                        "(coba “Balik arah”), kurangi Kp, atau naikkan Kd.")
+            elif "IMU" in l:
+                hint = "\n\nCek kabel IMU (SDA/SCL) dan sumber daya."
+            return f"ESP32 mematikan PID.\n\n“{l}”{hint}"
+        if any("FAILSAFE" in l for l in lines):
+            return ("Failsafe ESP32 aktif: perintah dari GUI tidak sampai tepat "
+                    "waktu (>0,5 detik).\n\nCek kabel USB dan pastikan GUI tidak "
+                    "macet (Serial Monitor harus ditutup).")
+        if any("I2C" in l or "IMU" in l for l in lines):
+            return f"Masalah pembacaan IMU:\n\n“{lines[-1]}”"
+        if lines:
+            return f"ESP32 tidak mengaktifkan PID. Pesan terakhir:\n\n“{lines[-1]}”"
+        return ("ESP32 tidak mengaktifkan PID dan tidak mengirim pesan apa pun.\n\n"
+                "Kemungkinan firmware yang ter-upload bukan versi terbaru "
+                "esp32_pid. Upload ulang esp32_pid lalu coba lagi.")
+
+    def _pid_failed(self):
+        reason = self._pid_failure_reason()
+        self.hw.error = "PID tidak aktif di ESP32 (alasan: lihat kotak pesan)."
+        self._set_pid_run(False)
+        box = QtWidgets.QMessageBox(QtWidgets.QMessageBox.Warning,
+                                    "PID tidak aktif", reason, parent=self)
+        box.setAttribute(Qt.WA_DeleteOnClose)
+        box.open()                      # tidak memblokir timer GUI
+
     def _motor_heartbeat(self):
+        if self.pid_run:
+            if not self.hw.receiving:                 # koneksi/data putus
+                self._set_pid_run(False)
+                return
+            if not self.hw.pid_active and time.monotonic() - self._pid_t0 > 1.5:
+                self._pid_failed()
+                return
+            self.hw.send_pid(True)
+            return
         if not self.chk_motor.isChecked():
             return
         if not self.hw.is_open:        # koneksi putus -> reset UI ke 0
@@ -864,6 +1173,7 @@ class MainWindow(QtWidgets.QMainWindow):
             if self.hw.recording:
                 self._toggle_record()
             self.chk_motor.setChecked(False)     # motor 0 sebelum putus
+            self._set_pid_run(False)
             self.hw.disconnect()
         else:
             port = self.cb_port.currentData()
@@ -872,6 +1182,7 @@ class MainWindow(QtWidgets.QMainWindow):
             else:
                 try:
                     self.hw.connect(port)
+                    self.hw.set_fmax(self.fmax.value())
                     self.reset()
                 except Exception as exc:
                     self.hw.error = f"Gagal membuka {port}: {exc}"
@@ -949,7 +1260,7 @@ class MainWindow(QtWidgets.QMainWindow):
                      f"sudut ESP32 {raw_s}  \u00b7  offset {hw.offset:+.2f}\u00b0")
         else:
             state = (f"{hw.port} terbuka, menunggu data\u2026  (pastikan firmware "
-                     "esp32_imu_test sudah di-upload & baud 115200; tekan EN "
+                     "esp32_pid (atau esp32_imu_test) sudah di-upload & baud 115200; tekan EN "
                      "di board jika perlu)")
         if hw.bad_lines:
             state += f"\nBaris rusak: {hw.bad_lines}"
@@ -1012,11 +1323,21 @@ class MainWindow(QtWidgets.QMainWindow):
         if mode == self.mode:
             return
         self.chk_motor.setChecked(False)       # motor 0 saat ganti mode
+        self._set_pid_run(False)
         self.stop_scenarios("Dihentikan (ganti sumber data)" if self.scn else None)
         if mode != "hw" and self.hw.recording:
             self._toggle_record()
         self.mode = mode
         hw = mode == "hw"
+        # gain: hardware punya nilai awal sendiri (konservatif, Ki = 0);
+        # gain simulasi disimpan & dipulihkan saat kembali ke Simulasi.
+        if hw:
+            self._sim_gains = (self.kp.value(), self.ki.value(), self.kd.value())
+            for prm, v in zip((self.kp, self.ki, self.kd), self.HW_GAINS):
+                prm.set_value_silent(v)
+        elif getattr(self, "_sim_gains", None):
+            for prm, v in zip((self.kp, self.ki, self.kd), self._sim_gains):
+                prm.set_value_silent(v)
         self.be = self.hw if hw else self.sim
         self.be.set_gains(self.kp.value(), self.ki.value(), self.kd.value())
         self.hw_box.setVisible(hw)
@@ -1026,6 +1347,9 @@ class MainWindow(QtWidgets.QMainWindow):
         for w in (self.sp, self.nz, self.btn_disturb,
                   self.btn_scn_run, self.btn_step):
             w.setEnabled(not hw)
+        # Mode hardware: slider noise, massa & posisi beban disembunyikan
+        for w in (self.nz, self.lm, self.lx):
+            w.setVisible(not hw)
         # Gain PID mengikuti status gembok (dan terkunci paksa saat mode HW).
         self._apply_pid_lock()
         self.btn_pid_lock.setEnabled(not hw)
@@ -1079,8 +1403,12 @@ class MainWindow(QtWidgets.QMainWindow):
         # Mode hardware memang sudah menonaktifkan PID; lock tetap dihormati
         # supaya saat kembali ke simulasi status kunci tidak "bocor".
         hw = self.mode == "hw"
+        run = getattr(self, "pid_run", False)
+        # Hardware: gembok PID simulasi tidak berlaku; gain terbuka hanya
+        # saat PID hardware aktif. Simulasi: ikuti gembok.
+        locked = False if hw else self.pid_locked
         for w in (self.kp, self.ki, self.kd):
-            w.set_locked(self.pid_locked or hw)
+            w.set_locked(locked)
         self.btn_pid_lock.setText("\U0001f512" if self.pid_locked else "\U0001f513")
         self.btn_pid_lock.setToolTip(
             "Gain PID terkunci \u2014 klik untuk membuka."
@@ -1260,7 +1588,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _set_angle_range(self, peak):
         """Sumbu Y sudut otomatis (kelipatan 5 deg, min +-25, maks +-50)
-        supaya kurva tidak hilang saat batang menyentuh batas +-30 deg."""
+        supaya kurva tidak hilang saat batang menyentuh batas +-33 deg."""
         lim = min(50.0, max(25.0, math.ceil((peak + 3.0) / 5.0) * 5.0))
         if lim != self._ylim:
             self._ylim = lim

@@ -31,7 +31,7 @@ Menggunakan representasi visual 3D **Processing (P3D)** yang sangat ringan mengg
 
 - **Python 3.10+** (diuji pada 3.14)
 - **Processing 4** (untuk viewer 3D) — https://processing.org/download
-- *(Opsional)* ESP32 + IMU GY-521 (MPU6050) dengan firmware `firmware/esp32_imu_test` untuk mode Hardware
+- *(Opsional)* ESP32 + IMU GY-521 (MPU6050) dengan firmware `firmware/esp32_pid` untuk mode Hardware
 
 Install dependensi Python:
 
@@ -92,7 +92,7 @@ VERSI 2/
 ├── BalancingPropellerIMU/   # Sketch Processing 3D viewer (.pde)
 ├── docs/                    # Dokumentasi & catatan (lihat docs/README.md)
 │   └── assets/              # Gambar pendukung (tampak atas/depan/…)
-├── firmware/                # Firmware ESP32 (esp32_imu_test: baca IMU)
+├── firmware/                # Firmware ESP32 (esp32_pid: IMU + motor + PID; esp32_imu_test: tes IMU; esp32_motor_only: tes/kalibrasi ESC)
 ├── data/                    # Hasil rekaman CSV (tidak di-commit)
 ├── run_app.py / run_app.bat # Launcher
 ├── requirements.txt

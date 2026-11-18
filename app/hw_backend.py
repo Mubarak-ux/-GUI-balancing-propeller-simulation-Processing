@@ -1,7 +1,7 @@
 """Backend hardware: membaca data ESP32 + IMU GY-521 (MPU6050) lewat USB Serial.
 
 TAHAP 1 - BACA IMU
-    * Firmware: ``firmware/esp32_imu_test/esp32_imu_test.ino``.
+    * Firmware: ``firmware/esp32_pid/esp32_pid.ino`` (tes IMU saja: esp32_imu_test).
     * ESP32 hanya membaca IMU; motor/ESC belum dikendalikan. GUI
       membaca, menampilkan, dan merekam. Satu-satunya data yang dikirim
       ke ESP32 adalah perintah ``c`` (kalibrasi ulang bias gyro).
@@ -104,6 +104,10 @@ class HardwareBackend:
         self.sp = 0.0
         self.load_m, self.load_x = 0.0, 0.10           # keterangan beban fisik
         self.noise = 0.0
+        self.cutoff_deg = 32.0   # batas mati motor (|sudut| > ini -> PID mati), 29..33
+        self.cutoff_on = True    # False = batas mati sudut dimatikan
+        self.trim = 0.0          # feedforward u (%, bingkai tampilan) untuk melawan
+                                 # torsi tetap (batang berat sebelah / thrust beda)
 
         # pemetaan sudut (diatur dari GUI)
         self.angle_field = ANGLE_FIELD
@@ -214,6 +218,29 @@ class HardwareBackend:
         l = max(0.0, min(100.0, float(left_pct)))
         r = max(0.0, min(100.0, float(right_pct)))
         return self.send_command(f"M,{l:.1f},{r:.1f}\n")
+
+    def set_fmax(self, pct):
+        """Kirim batas atas throttle (F-max, 8..15 %) ke firmware."""
+        p = max(8.0, min(15.0, float(pct)))
+        return self.send_command(f"F,{p:.1f}\n")
+
+    def send_pid(self, on):
+        """Heartbeat kontrol PID ke firmware esp32_pid (kirim tiap <= 100 ms;
+        firmware mematikan PID jika perintah berhenti > 500 ms).
+
+        Setpoint GUI (bingkai tampilan) diubah ke bingkai sudut firmware:
+        tampilan = s*mentah - offset  ->  mentah = s*(tampilan + offset)."""
+        s = self._sign()
+        sp_raw = s * (self.sp + self.offset)
+        return self.send_command(
+            f"P,{1 if on else 0},{sp_raw:.2f},{self.kp:.3f},{self.ki:.3f},"
+            f"{self.kd:.3f},{int(s)},{self.cutoff_deg:.1f},"
+            f"{1 if self.cutoff_on else 0},{s * self.trim:.1f}\n")
+
+    @staticmethod
+    def thrust_n(pct):
+        """Throttle (%) -> gaya dorong (N), fit linear 8..15 % (docs/pengukuran_F.md)."""
+        return max(0.0, 0.1241 * pct - 0.316) if pct >= 8.0 else 0.0
 
     def stop_motors(self):
         return self.send_command("x\n")
@@ -403,6 +430,7 @@ class HardwareBackend:
         self.meas = self.prev_meas = 0.0
         self.u = 0.0
         self.F1 = self.F2 = 0.0
+        self.pid_active = False
         self.I = 0.0
         self.p_term = self.i_term = self.d_term = 0.0
 
@@ -417,7 +445,9 @@ class HardwareBackend:
         self.load_m, self.load_x = mass_kg, pos_m
 
     def reset_integral(self):
-        pass
+        """Nolkan integral PID di ESP32 (firmware esp32_pid)."""
+        if self.is_open:
+            self.send_command("Z\n")
 
     def apply_impulse(self, delta_w=2.0):
         pass                     # tidak berlaku di hardware
@@ -458,6 +488,18 @@ class HardwareBackend:
         r = RATE_FIELD - 1
         rate = self._sign() * vals[r] if len(vals) > r else self._omega(deg)
         self.w = math.radians(rate)
+        # telemetri PID dari firmware esp32_pid (kolom 9..15):
+        # pid_on, u, kiri%, kanan%, P, I, D  (bingkai firmware -> tampilan: kali tanda)
+        if len(vals) >= 15:
+            sg = self._sign()
+            self.pid_active = vals[8] > 0.5
+            self.u = sg * vals[9]
+            self.F1 = self.thrust_n(vals[10])
+            self.F2 = self.thrust_n(vals[11])
+            self.p_term, self.i_term, self.d_term = (sg * vals[12], sg * vals[13],
+                                                     sg * vals[14])
+        else:
+            self.pid_active = False
         return self.sample()
 
     def sample(self):

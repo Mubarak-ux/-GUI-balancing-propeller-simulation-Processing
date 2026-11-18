@@ -7,7 +7,7 @@
 
 ## 1. Batas throttle hasil uji slider (week 2)
 
-Uji dengan slider Tes Motor di GUI (firmware `esp32_motor_test`, ESC sudah dikalibrasi
+Uji dengan slider Tes Motor di GUI (firmware `esp32_pid`, ESC sudah dikalibrasi
 1000–2000 µs, PWM 50 Hz).
 
 | Besaran | Throttle | Pulsa ESC | Duty (50 Hz) |
