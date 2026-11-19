@@ -35,7 +35,7 @@ def _light_palette():
     return pal
 
 
-def run(seed=None, initial_mode="sim"):
+def run(seed=None, initial_mode="hw"):
     app = QtWidgets.QApplication(sys.argv)
     app.setStyle("Fusion")
     app.setPalette(_light_palette())

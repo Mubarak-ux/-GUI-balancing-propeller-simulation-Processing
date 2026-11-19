@@ -19,7 +19,7 @@ import sys
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
-def run_gui(initial_mode="sim", seed=None):
+def run_gui(initial_mode="hw", seed=None):
     print("[GUI] Menjalankan GUI Python...")
     from app.main import run
     return run(initial_mode=initial_mode, seed=seed)
@@ -34,8 +34,8 @@ def main():
                     help="buka sketch di editor Processing saja (tidak langsung Run)")
     ap.add_argument("--no-3d", action="store_true",
                     help="jangan buka Processing (default; dipertahankan untuk kompatibilitas)")
-    ap.add_argument("--mode", choices=["hw", "sim"], default="sim",
-                    help="mode awal saat GUI dibuka: 'hw' (Hardware) atau 'sim' (Simulasi), default: sim")
+    ap.add_argument("--mode", choices=["hw", "sim"], default="hw",
+                    help="mode awal saat GUI dibuka: 'hw' (Hardware) atau 'sim' (Simulasi), default: hw")
     ap.add_argument("--seed", type=int, default=None,
                     help="seed noise simulasi agar hasil reproducible (default: acak)")
     args = ap.parse_args()

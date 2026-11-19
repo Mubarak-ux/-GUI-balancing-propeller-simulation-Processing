@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1160 370" width="1160" height="370" font-family="Segoe UI, Arial, sans-serif" font-size="14" fill="#111">
+  <defs>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#222"/>
+    </marker>
+    <style>
+      .pid { fill:#e8f0fe; stroke:#1a56db; stroke-width:1.6; }
+      .blk { fill:#f5f7fa; stroke:#334155; stroke-width:1.6; }
+      .hw  { fill:#fef3e2; stroke:#b45309; stroke-width:1.6; }
+      .sen { fill:#e7f6ec; stroke:#15803d; stroke-width:1.6; }
+      .sum { fill:#fff; stroke:#222; stroke-width:1.6; }
+      .w   { fill:none; stroke:#222; stroke-width:1.8; }
+      .t   { text-anchor:middle; }
+      .b   { font-weight:600; }
+      .s   { font-size:12px; fill:#374151; }
+      .lbl { font-size:13px; font-style:italic; text-anchor:middle; }
+      .sg  { font-size:17px; font-weight:700; }
+    </style>
+  </defs>
+
+  <rect x="0" y="0" width="1160" height="370" fill="#ffffff"/>
+
+  <text x="30" y="34" font-size="18" class="b">Blok Diagram Kontrol PID Sudut Batang (versi sederhana)</text>
+
+  <!-- setpoint -->
+  <text class="lbl" x="60" y="140">θ_sp (setpoint)</text>
+  <path class="w" d="M30,150 H130" marker-end="url(#ar)"/>
+
+  <!-- penjumlah -->
+  <circle class="sum" cx="150" cy="150" r="18"/>
+  <text class="t" x="150" y="156" font-size="17">Σ</text>
+  <text class="sg" x="118" y="143">+</text>
+  <text class="sg" x="158" y="190">−</text>
+
+  <!-- error -->
+  <path class="w" d="M168,150 H218" marker-end="url(#ar)"/>
+  <text class="lbl" x="193" y="142">e</text>
+
+  <!-- PID -->
+  <rect class="pid" x="220" y="110" width="160" height="80" rx="8"/>
+  <text class="t b" x="300" y="140">Pengendali PID</text>
+  <text class="t s" x="300" y="160">Kp · Ki · Kd</text>
+  <text class="t s" x="300" y="176">ESP32, 500 Hz</text>
+
+  <path class="w" d="M380,150 H438" marker-end="url(#ar)"/>
+  <text class="lbl" x="409" y="142">u</text>
+
+  <!-- mixer -->
+  <rect class="blk" x="440" y="110" width="150" height="80" rx="8"/>
+  <text class="t b" x="515" y="140">Mixer</text>
+  <text class="t s" x="515" y="160">kiri = bias − d</text>
+  <text class="t s" x="515" y="176">kanan = bias + d</text>
+
+  <path class="w" d="M590,150 H648" marker-end="url(#ar)"/>
+  <text class="lbl" x="619" y="142">PWM</text>
+
+  <!-- aktuator -->
+  <rect class="hw" x="650" y="110" width="160" height="80" rx="8"/>
+  <text class="t b" x="730" y="140">ESC + Motor</text>
+  <text class="t b" x="730" y="160">+ Propeller</text>
+  <text class="t s" x="730" y="177">kiri &amp; kanan</text>
+
+  <path class="w" d="M810,150 H868" marker-end="url(#ar)"/>
+  <text class="lbl" x="839" y="142">F_L, F_R</text>
+
+  <!-- plant -->
+  <rect class="hw" x="870" y="110" width="140" height="80" rx="8"/>
+  <text class="t b" x="940" y="145">Batang</text>
+  <text class="t s" x="940" y="165">(plant)</text>
+
+  <!-- output -->
+  <path class="w" d="M1010,150 H1128" marker-end="url(#ar)"/>
+  <text class="lbl" x="1100" y="142">θ</text>
+  <circle cx="1060" cy="150" r="4" fill="#222"/>
+
+  <!-- umpan balik -->
+  <path class="w" d="M1060,150 V295 H822" marker-end="url(#ar)"/>
+  <rect class="sen" x="580" y="255" width="240" height="80" rx="8"/>
+  <text class="t b" x="700" y="283">Sensor IMU MPU6050</text>
+  <text class="t s" x="700" y="303">+ filter komplementer</text>
+  <text class="t s" x="700" y="320">(gyro + akselerometer)</text>
+  <path class="w" d="M580,295 H150 V170" marker-end="url(#ar)"/>
+  <text class="lbl" x="365" y="287">θ̂ (sudut terukur)</text>
+</svg>

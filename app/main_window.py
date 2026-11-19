@@ -47,9 +47,9 @@ SCENARIOS = [
     ("Step 0\u00b0 \u2192 +10\u00b0", dict(sp=0.0), ("sp", 10.0)),
     ("Step 0\u00b0 \u2192 \u221210\u00b0", dict(sp=0.0), ("sp", -10.0)),
     ("Step +10\u00b0 \u2192 0\u00b0", dict(sp=10.0), ("sp", 0.0)),
-    ("Beban 200 g @ 10 cm", dict(sp=0.0), ("load", (0.2, 0.10))),
-    ("Beban 400 g @ 15 cm", dict(sp=0.0), ("load", (0.4, 0.15))),
-    ("Lepas beban 200 g @ 10 cm", dict(sp=0.0, load=(0.2, 0.10)), ("load", (0.0, 0.10))),
+    ("Beban 50 g @ 10 cm", dict(sp=0.0), ("load", (0.05, 0.10))),
+    ("Beban 100 g @ 10 cm", dict(sp=0.0), ("load", (0.10, 0.10))),
+    ("Lepas beban 50 g @ 10 cm", dict(sp=0.0, load=(0.05, 0.10)), ("load", (0.0, 0.10))),
 ]
 SCN_SETTLE_S = 4.0    # detik simulasi sebelum perubahan diterapkan
 SCN_MEASURE_S = 8.0   # detik simulasi pengukuran setelah perubahan
@@ -116,7 +116,7 @@ class MainWindow(QtWidgets.QMainWindow):
     # hasil start_processing() dari thread latar -> thread GUI
     _open3d_done = QtCore.Signal(bool, str)
 
-    def __init__(self, seed=None, initial_mode="sim"):
+    def __init__(self, seed=None, initial_mode="hw"):
         super().__init__()
         self.setWindowTitle("Balancing Propeller")
         self._open3d_waits = 0
@@ -361,7 +361,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.view = BeamView()
         self.view.impulse_requested.connect(self.trigger_impulse)
         self.view.setMinimumHeight(240)
-        self.view.Fmax, self.view.L = self.be.p.Fmax, self.be.p.L
+        self.view.Fmax, self.view.L = 2.0, self.be.p.L
         self.view.LIMIT_DEG = math.degrees(self.be.p.stop)
         lim = self.view.LIMIT_DEG
 
@@ -431,9 +431,6 @@ class MainWindow(QtWidgets.QMainWindow):
         # garis batas kerja PID: F-min 8 % dan F-max (hanya bermakna di hardware)
         self.ln_fmin = self.p7.addLine(y=8.0, pen=pg.mkPen(MUTED, width=1, style=Qt.DotLine))
         self.ln_fmax = self.p7.addLine(y=15.0, pen=pg.mkPen(RED, width=1, style=Qt.DotLine))
-        self.ln_fmin.setVisible(False)      # mode awal simulasi: tanpa garis batas
-        self.ln_fmax.setVisible(False)
-        self.p7.setLabel("left", "F / Fmax", "%")
 
         plots = (self.p1, self.p2, self.p3, self.p4, self.p5, self.p7)
         for pl in plots:
@@ -584,10 +581,10 @@ class MainWindow(QtWidgets.QMainWindow):
         self.kp = Param("Kp", 0, 5, self.be.kp, 0.05, "%/\u00b0")
         self.ki = Param("Ki", 0, 3, self.be.ki, 0.05, "%/(\u00b0\u00b7s)")
         self.kd = Param("Kd", 0, 1.5, self.be.kd, 0.05, "%/(\u00b0/s)")
-        self.kp.setToolTip("Gain proporsional: u_P = Kp \u00b7 e\n"
-                           "Batas stabil kira-kira Kp < 0.2 + 11.4\u00b7Kd")
+        self.kp.setToolTip("Gain proporsional: u_P = Kp \u00b7 e (%/\u00b0)\n"
+                           "Gain terpilih di alat: Kp 3 / Ki 2 / Kd 1")
         self.ki.setToolTip("Gain integral: u_I = Ki \u00b7 \u222be dt (dengan anti-windup)")
-        self.kd.setToolTip("Gain derivatif: u_D = \u2212Kd \u00b7 d\u03b8/dt (D pada pengukuran, filter 20 ms)")
+        self.kd.setToolTip("Gain derivatif: u_D = \u2212Kd \u00b7 laju gyro (D pada pengukuran)")
         for w in (self.kp, self.ki, self.kd):
             controller.body.addWidget(w)
             w.changed.connect(self.on_gains)
@@ -1442,10 +1439,10 @@ class MainWindow(QtWidgets.QMainWindow):
             self.tabs.setCurrentIndex(0)
         self.tabs.setTabVisible(self._scn_tab_idx, not hw)
         # skala panah gaya di tampilan 2D: alat asli ~0,7-2 N, simulasi s/d 8 N
-        self.view.Fmax = 2.0 if hw else self.sim.p.Fmax
-        self.p7.setLabel("left", "Throttle" if hw else "F / Fmax", "%")
-        self.ln_fmin.setVisible(hw)
-        self.ln_fmax.setVisible(hw)
+        self.view.show_load = not hw
+        self.view.update()
+        # garis F-max: alat = slider F-max, simulasi = Params.Fmax
+        self.ln_fmax.setValue(self.fmax.value() if hw else self.sim.p.Fmax)
         self._hw_t_prev = None
         self.hw_adv_card.setVisible(hw)
         # Mode hardware: PID, setpoint, noise, impuls & skenario tidak berlaku
@@ -1618,14 +1615,13 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _throttles(self, s):
         """Throttle kiri/kanan (%) untuk grafik. Hardware: nilai yang
-        dilaporkan ESP32. Simulasi: F / Fmax x 100 (setara persen gaya)."""
+        dilaporkan ESP32. Simulasi: throttle model (hukum kontrol sama)."""
         if self.mode == "hw":
             f = self.hw.fields()
             if f and len(f) >= 15:
                 return (f[10], f[11])
             return (0.0, 0.0)
-        fm = self.sim.p.Fmax
-        return (s[COL_F1] / fm * 100.0, s[COL_F2] / fm * 100.0)
+        return (self.sim.thr_l, self.sim.thr_r)
 
     def _hw_prop_rates(self):
         """Kecepatan putar visual baling-baling mode hardware (deg/s) dari
@@ -1687,7 +1683,8 @@ class MainWindow(QtWidgets.QMainWindow):
         t, th, _meas, sp, _u, F1, F2 = s[:7]
 
         if self.mode == "sim":
-            r1, r2 = self._prop_rate(F1), self._prop_rate(F2)
+            r1, r2 = (self.PROP_IDLE_DPS + 90.0 * thr
+                      for thr in (self.sim.thr_l, self.sim.thr_r))
         else:
             r1, r2 = self._hw_prop_rates()
         self.prop1_rot = (self.prop1_rot + r1 * dtg) % self.PROP_WRAP

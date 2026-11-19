@@ -247,8 +247,11 @@ delay= 0.03..0.05    # s
 stop = 33 deg        # batas mekanik
 ```
 
-Catatan: `app/sim_backend.py` masih memakai nilai lama (`Fmax = 8 N` tebakan,
-`tau = 0,10 s`, `l = 0`); belum diperbarui ke nilai di atas.
+Catatan: `app/sim_backend.py` sudah memakai model ini (k = −0,065, asimetri sisi
+negatif −0,04, torsi tetap c0 = 0,024 N·m, τ = 0,15 s, delay 0,04 s, turbulensi
+0,006 N·m) dan hukum kontrol yang sama dengan firmware `esp32_pid`. Dengan gain
+3 / 2 / 1 simulasi memberi lewat setpoint ~3,6° (+10) dan ~8,6° (−10), dekat
+dengan alat (4,9° dan 9,3°).
 
 ---
 

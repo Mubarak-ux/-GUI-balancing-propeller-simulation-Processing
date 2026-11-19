@@ -1,0 +1,228 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1640 720" width="1640" height="720" font-family="Segoe UI, Arial, sans-serif" font-size="13" fill="#111">
+  <defs>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#222"/>
+    </marker>
+    <marker id="arg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#777"/>
+    </marker>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#b91c1c"/>
+    </marker>
+    <style>
+      .blk  { fill:#f5f7fa; stroke:#334155; stroke-width:1.5; }
+      .pid  { fill:#e8f0fe; stroke:#1a56db; stroke-width:1.5; }
+      .hw   { fill:#fef3e2; stroke:#b45309; stroke-width:1.5; }
+      .sen  { fill:#e7f6ec; stroke:#15803d; stroke-width:1.5; }
+      .saf  { fill:#fdecec; stroke:#b91c1c; stroke-width:1.5; }
+      .sum  { fill:#fff; stroke:#222; stroke-width:1.5; }
+      .w    { fill:none; stroke:#222; stroke-width:1.6; }
+      .wg   { fill:none; stroke:#777; stroke-width:1.4; stroke-dasharray:6 4; }
+      .wr   { fill:none; stroke:#b91c1c; stroke-width:1.6; stroke-dasharray:6 4; }
+      .t    { text-anchor:middle; }
+      .b    { font-weight:600; }
+      .s    { font-size:11px; fill:#374151; }
+      .m    { font-family:Consolas, 'Courier New', monospace; font-size:11.5px; }
+      .lbl  { font-size:12px; font-style:italic; text-anchor:middle; }
+      .sg   { font-size:15px; font-weight:700; }
+    </style>
+  </defs>
+
+  <rect x="0" y="0" width="1640" height="720" fill="#ffffff"/>
+
+  <!-- judul -->
+  <text x="30" y="30" font-size="18" class="b">Blok Diagram Kontrol PID Sudut Batang (firmware esp32_pid.ino)</text>
+  <text x="30" y="50" class="s">Semua blok di kiri IMU berjalan di ESP32 dalam satu loop 500 Hz (dt ≈ 2 ms), kecuali penulis PWM (task core 0)</text>
+
+  <!-- wilayah PID -->
+  <rect x="270" y="60" width="270" height="350" rx="8" fill="#f3f7ff" stroke="#93b4f5" stroke-dasharray="5 4"/>
+  <text x="280" y="77" font-size="12" class="b" fill="#1a56db">Pengendali PID (runPid, fase 2)</text>
+
+  <!-- setpoint -->
+  <rect class="blk" x="30" y="228" width="125" height="64" rx="6"/>
+  <text class="t b" x="92" y="255">Setpoint θ_sp</text>
+  <text class="t s" x="92" y="274">dari GUI, ±20°</text>
+  <path class="w" d="M155,260 H182" marker-end="url(#ar)"/>
+
+  <!-- penjumlah 1 -->
+  <circle class="sum" cx="200" cy="260" r="16"/>
+  <text class="t" x="200" y="266" font-size="16">Σ</text>
+  <text class="sg" x="168" y="252">+</text>
+  <text class="sg" x="207" y="298">−</text>
+
+  <!-- error dan cabang -->
+  <path class="w" d="M216,260 H288" marker-end="url(#ar)"/>
+  <text class="lbl" x="232" y="252">e</text>
+  <circle cx="250" cy="260" r="3.5" fill="#222"/>
+  <path class="w" d="M250,260 V180 H288" marker-end="url(#ar)"/>
+
+  <!-- trim -->
+  <rect class="pid" x="290" y="88" width="140" height="44" rx="6"/>
+  <text class="t b" x="360" y="108">Trim u_ff (GUI)</text>
+  <text class="t s" x="360" y="124">±60 %</text>
+  <path class="w" d="M430,110 H510 V241" marker-end="url(#ar)"/>
+
+  <!-- P -->
+  <rect class="pid" x="290" y="155" width="140" height="50" rx="6"/>
+  <text class="t b" x="360" y="185">Kp · e</text>
+  <path class="w" d="M430,180 H490 V241" marker-end="url(#ar)"/>
+
+  <!-- I -->
+  <rect class="pid" x="290" y="228" width="140" height="64" rx="6"/>
+  <text class="t b" x="360" y="250">Ki · ∫ e dt</text>
+  <text class="t s" x="360" y="267">I-zone ±6° (luar ×0,5)</text>
+  <text class="t s" x="360" y="282">dijepit ±100</text>
+  <path class="w" d="M430,260 H478" marker-end="url(#ar)"/>
+
+  <!-- D -->
+  <rect class="pid" x="290" y="338" width="140" height="58" rx="6"/>
+  <text class="t b" x="360" y="362">−Kd · θ̇</text>
+  <text class="t s" x="360" y="381">turunan pada pengukuran</text>
+  <path class="w" d="M430,367 H500 V282" marker-end="url(#ar)"/>
+
+  <!-- penjumlah 2 -->
+  <circle class="sum" cx="500" cy="260" r="20"/>
+  <text class="t" x="500" y="266" font-size="17">Σ</text>
+  <text class="s" x="477" y="238">+</text>
+  <text class="s" x="514" y="238">+</text>
+  <text class="s" x="466" y="254">+</text>
+  <text class="s" x="505" y="298">+</text>
+
+  <!-- saturasi -->
+  <path class="w" d="M520,260 H558" marker-end="url(#ar)"/>
+  <text class="lbl" x="539" y="252">u_raw</text>
+  <rect class="blk" x="560" y="230" width="90" height="60" rx="6"/>
+  <text class="t b" x="605" y="245" font-size="12">Saturasi</text>
+  <line x1="582" y1="262" x2="628" y2="262" stroke="#bbb"/>
+  <line x1="605" y1="250" x2="605" y2="274" stroke="#bbb"/>
+  <polyline points="583,272 596,272 614,252 627,252" fill="none" stroke="#1a56db" stroke-width="1.8"/>
+  <text class="t s" x="605" y="285">±100 %</text>
+
+  <!-- anti-windup -->
+  <path class="wg" d="M605,290 V316 H360 V294" marker-end="url(#arg)"/>
+  <text x="612" y="312" font-size="10.5" fill="#666">anti-windup: integrasi berhenti saat jenuh</text>
+
+  <!-- mixer -->
+  <path class="w" d="M650,260 H688" marker-end="url(#ar)"/>
+  <text class="lbl" x="669" y="252">u</text>
+  <rect class="blk" x="690" y="190" width="160" height="140" rx="6"/>
+  <text class="t b" x="770" y="210">Mixer diferensial</text>
+  <text class="t m" x="770" y="230">bias = (Fmin+Fmax)/2</text>
+  <text class="t m" x="770" y="247">R = (Fmax−Fmin)/2</text>
+  <text class="t m" x="770" y="264">d = dir · u/100 · R</text>
+  <text class="t m" x="770" y="286">kiri  = bias − d</text>
+  <text class="t m" x="770" y="303">kanan = bias + d</text>
+  <text class="t s" x="770" y="321">Fmin = 8 %</text>
+
+  <path class="w" d="M850,235 H888" marker-end="url(#ar)"/>
+  <path class="w" d="M850,285 H888" marker-end="url(#ar)"/>
+  <text class="t s" x="869" y="228">kiri</text>
+  <text class="t s" x="869" y="278">kanan</text>
+
+  <!-- pembatas laju -->
+  <rect class="blk" x="890" y="200" width="120" height="120" rx="6"/>
+  <text class="t b" x="950" y="254">Pembatas laju</text>
+  <text class="t s" x="950" y="273">40 %/s per motor</text>
+  <path class="w" d="M1010,235 H1038" marker-end="url(#ar)"/>
+  <path class="w" d="M1010,285 H1038" marker-end="url(#ar)"/>
+
+  <!-- clamp -->
+  <rect class="blk" x="1040" y="200" width="90" height="120" rx="6"/>
+  <text class="t b" x="1085" y="252">Clamp</text>
+  <text class="t s" x="1085" y="270">0 … Fmax</text>
+  <text class="t s" x="1085" y="286">Fmax 8–20 %</text>
+  <path class="w" d="M1130,235 H1158" marker-end="url(#ar)"/>
+  <path class="w" d="M1130,285 H1158" marker-end="url(#ar)"/>
+
+  <!-- soft-start -->
+  <rect class="blk" x="890" y="92" width="240" height="58" rx="6"/>
+  <text class="t b" x="1010" y="115" font-size="12">Soft-start (fase 1, t &lt; 1,7 s)</text>
+  <text class="t s" x="1010" y="135">0 → Fmin dalam 1 s, tahan 0,7 s</text>
+  <path class="wg" d="M1085,150 V198" marker-end="url(#arg)"/>
+  <text x="1092" y="182" font-size="10.5" fill="#666">gantikan output PID</text>
+
+  <!-- penulis PWM -->
+  <rect class="hw" x="1160" y="200" width="130" height="120" rx="6"/>
+  <text class="t b" x="1225" y="238">Tulis PWM</text>
+  <text class="t s" x="1225" y="257">task core 0, 200 Hz</text>
+  <text class="t s" x="1225" y="274">LEDC 50 Hz, 16-bit</text>
+  <text class="t s" x="1225" y="291">1000 + 10·thr µs</text>
+  <path class="w" d="M1290,235 H1318" marker-end="url(#ar)"/>
+  <path class="w" d="M1290,285 H1318" marker-end="url(#ar)"/>
+
+  <!-- motor -->
+  <rect class="hw" x="1320" y="200" width="110" height="120" rx="6"/>
+  <text class="t b" x="1375" y="238">ESC 30A +</text>
+  <text class="t b" x="1375" y="256">A2212 + baling</text>
+  <text class="t s" x="1375" y="280">kiri CCW · IO26</text>
+  <text class="t s" x="1375" y="296">kanan CW · IO25</text>
+  <path class="w" d="M1430,235 H1468" marker-end="url(#ar)"/>
+  <path class="w" d="M1430,285 H1468" marker-end="url(#ar)"/>
+  <text class="lbl" x="1449" y="228">F_L</text>
+  <text class="lbl" x="1449" y="278">F_R</text>
+
+  <!-- plant -->
+  <rect class="hw" x="1470" y="200" width="120" height="120" rx="6"/>
+  <text class="t b" x="1530" y="246">Batang</text>
+  <text class="t s" x="1530" y="264">(plant)</text>
+  <text class="t m" x="1530" y="288">τ ∝ (F_R−F_L)·L</text>
+
+  <!-- pengaman -->
+  <rect class="saf" x="1160" y="64" width="430" height="104" rx="6"/>
+  <text x="1175" y="86" class="b" fill="#b91c1c">Pengaman → pidOff(): motor 0 %</text>
+  <text x="1175" y="106" class="s">• |θ̂| &gt; batas mati 29–33° (default 32°)</text>
+  <text x="1175" y="123" class="s">• tidak ada perintah GUI &gt; 500 ms (failsafe)</text>
+  <text x="1175" y="140" class="s">• data IMU tidak masuk &gt; 50 ms</text>
+  <text x="1175" y="157" class="s">• PID hanya boleh mulai jika |θ̂| ≤ 30°</text>
+  <path class="wr" d="M1225,168 V198" marker-end="url(#arr)"/>
+
+  <!-- sudut nyata ke IMU -->
+  <path class="w" d="M1530,320 V468" marker-end="url(#ar)"/>
+  <text x="1540" y="392" font-size="13" font-style="italic">θ</text>
+  <text x="1540" y="408" class="s">sudut nyata</text>
+
+  <!-- IMU -->
+  <rect class="sen" x="1380" y="470" width="210" height="110" rx="6"/>
+  <text class="t b" x="1485" y="493">IMU MPU6050 (GY-521)</text>
+  <text class="t s" x="1485" y="513">DLPF 21 Hz · ±250 °/s · ±2 g</text>
+  <text class="t s" x="1485" y="530">I²C 400 kHz · baca 500 Hz</text>
+  <text class="t s" x="1485" y="547">ω dikurangi bias kalibrasi</text>
+  <text class="t s" x="1485" y="564">(1000 sampel saat diam)</text>
+
+  <!-- IMU ke filter -->
+  <path class="w" d="M1380,500 H1122" marker-end="url(#ar)"/>
+  <text class="lbl" x="1318" y="492">ω_y (°/s)</text>
+  <path class="w" d="M1380,550 H1122" marker-end="url(#ar)"/>
+  <text class="lbl" x="1250" y="542">a_x, a_y, a_z</text>
+
+  <!-- cabang gyro ke D -->
+  <circle cx="1250" cy="500" r="3.5" fill="#222"/>
+  <path class="w" d="M1250,500 V430 H360 V398" marker-end="url(#ar)"/>
+  <text class="lbl" x="800" y="423">θ̇ = ω_y (laju sudut langsung dari gyro)</text>
+
+  <!-- filter komplementer -->
+  <rect class="sen" x="860" y="470" width="260" height="110" rx="6"/>
+  <text class="t b" x="990" y="493">Filter komplementer</text>
+  <text class="t m" x="990" y="515">θ̂ = α(θ̂ + ω·dt) + (1−α)·θ_acc</text>
+  <text class="t m" x="990" y="535">α = τ/(τ+dt),  τ = 0,7 s</text>
+  <text class="t m" x="990" y="555">θ_acc = atan2(−a_x, √(a_y²+a_z²))</text>
+
+  <!-- umpan balik sudut -->
+  <path class="w" d="M860,525 H200 V278" marker-end="url(#ar)"/>
+  <text class="lbl" x="530" y="517">θ̂ (sudut terukur)</text>
+
+  <!-- legenda -->
+  <line x1="30" y1="626" x2="80" y2="626" class="w" marker-end="url(#ar)"/>
+  <text x="88" y="630" class="s">sinyal</text>
+  <line x1="150" y1="626" x2="200" y2="626" class="wg" marker-end="url(#arg)"/>
+  <text x="208" y="630" class="s">aksi tambahan (anti-windup, soft-start)</text>
+  <line x1="450" y1="626" x2="500" y2="626" class="wr" marker-end="url(#arr)"/>
+  <text x="508" y="630" class="s">pengaman</text>
+  <rect x="600" y="618" width="14" height="14" class="pid"/><text x="620" y="630" class="s">PID</text>
+  <rect x="660" y="618" width="14" height="14" class="sen"/><text x="680" y="630" class="s">sensor + estimasi</text>
+  <rect x="800" y="618" width="14" height="14" class="hw"/><text x="820" y="630" class="s">aktuator + plant</text>
+
+  <text x="30" y="656" class="m">Hukum kontrol (fase 2):  u = sat±100( trim + Kp·e + I − Kd·θ̇ ),  e = θ_sp − θ̂,  I += Ki·e·dt  (×0,5 di luar ±6°, berhenti saat jenuh)</text>
+  <text x="30" y="678" class="s">Laju: baca IMU + filter + PID 500 Hz (dt ≈ 2 ms) · tulis PWM 200 Hz di core 0 · ESC membaca PWM 50 Hz · telemetri ke GUI 100 Hz · heartbeat GUI tiap ≤ 100 ms</text>
+  <text x="30" y="698" class="s">Gain dari GUI: Kp ≤ 5 %/°, Ki ≤ 3 %/(°·s), Kd ≤ 1,5 %/(°/s) · dir = ±1 menyamakan tanda bingkai GUI · θ positif = sisi kanan naik, u &gt; 0 → motor kanan naik</text>
+</svg>

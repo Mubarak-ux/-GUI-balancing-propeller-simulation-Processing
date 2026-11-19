@@ -16,6 +16,7 @@ class BeamView(QtWidgets.QWidget):
     impulse_requested = QtCore.Signal(float)
     FOOTER_H = 60
     LIMIT_DEG = 33.0     # batas mekanik +/-33 deg (sinkron dengan Params.stop)
+    show_load = True     # kolom BEBAN di footer (False di mode hardware)
     BEAM_HALF = 0.27     # m, setengah panjang batang 54 cm (terukur)
     PROP_RADIUS = 0.127  # m, propeler 1045 = 10 inci -> jari-jari 5 inci
 
@@ -244,6 +245,8 @@ class BeamView(QtWidgets.QWidget):
             ("BEBAN", f"{self.m * 1000:.0f} g @ {self.x * 100:.0f} cm" if self.m > 0 else "tanpa beban",
              RED if self.m > 0 else MUTED),
         ]
+        if not self.show_load:          # mode hardware: tidak ada beban simulasi
+            cols = cols[:3]
         cw = W / len(cols)
         fl = QtGui.QFont("Segoe UI", 7, QtGui.QFont.Bold)
         fv = QtGui.QFont("Consolas", 12, QtGui.QFont.Bold)
